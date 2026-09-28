@@ -864,6 +864,19 @@ textarea {
   transform: translateY(1px) scale(0.98);
 }
 
+/* Controls stay anchored; feedback comes from color/icon/label changes. */
+.sound-button.icon-button:hover,
+.share-button.icon-button:hover:not(:disabled),
+.download-button:hover:not(.is-disabled) {
+  transform: none;
+}
+
+.sound-button.icon-button:active,
+.share-button.icon-button:active:not(:disabled),
+.download-button:active:not(.is-disabled) {
+  transform: scale(0.98);
+}
+
 /* Let the sketch input sit cleanly on the white page without a second white
    rectangle inside the hand-drawn border. */
 textarea {

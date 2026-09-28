@@ -6,10 +6,14 @@ const stage = document.querySelector("#stage");
 const hamsterVideo = document.querySelector("#hamster-video");
 const status = document.querySelector("#status");
 const downloadButton = document.querySelector("#download-button");
+const downloadLabel = document.querySelector("#download-label");
+const downloadIcon = document.querySelector("#download-icon");
 const soundButton = document.querySelector("#sound-button");
 const soundLabel = document.querySelector("#sound-label");
 const soundIcon = document.querySelector("#sound-icon");
 const shareButton = document.querySelector("#share-button");
+const shareLabel = document.querySelector("#share-label");
+const shareIcon = document.querySelector("#share-icon");
 const exportCanvas = document.querySelector("#export-canvas");
 const exportContext = exportCanvas.getContext("2d", { alpha: false });
 const analysisCanvas = document.createElement("canvas");
@@ -41,6 +45,8 @@ let messageVersion = 0;
 let renderPending = false;
 let exportSlide = 0;
 let cleanEndFrame;
+let downloadResetTimer;
+let shareResetTimer;
 
 function cleanMessage() {
   return messageInput.value.trim() || "Small steps. Big wheel energy.";
@@ -244,6 +250,9 @@ async function toggleSound() {
   soundButton.setAttribute("aria-pressed", String(soundEnabled));
   soundLabel.textContent = soundEnabled ? "Sound on" : "Sound off";
   soundIcon.classList.toggle("is-on", soundEnabled);
+  soundIcon.innerHTML = soundEnabled
+    ? '<path d="M3 8h3l4-3v10l-4-3H3zM13 7.2a4 4 0 0 1 0 5.6M15.4 5a7 7 0 0 1 0 10" />'
+    : '<path d="M3 8h3l4-3v10l-4-3H3zM14 7l3 3m0 0-3 3" />';
   soundButton.setAttribute("aria-label", soundEnabled ? "Turn sound off" : "Turn sound on");
   if (hamsterVideo.paused && !rendering) await hamsterVideo.play();
 }
@@ -539,6 +548,13 @@ function downloadVideo(event) {
   link.click();
   link.remove();
   if (!renderedUrl) window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  downloadLabel.textContent = "Downloaded";
+  downloadIcon.innerHTML = '<path d="m5 10 3.2 3.2L15.5 6" />';
+  window.clearTimeout(downloadResetTimer);
+  downloadResetTimer = window.setTimeout(() => {
+    downloadLabel.textContent = "Download it";
+    downloadIcon.innerHTML = '<path d="M10 2v10m0 0 4-4m-4 4-4-4M3 16.5h14" />';
+  }, 1600);
 }
 
 function gifLzw(indices) {
@@ -692,6 +708,13 @@ async function shareVideo() {
       helper.remove();
     }
     status.textContent = "Link copied";
+    shareLabel.textContent = "Copied";
+    shareIcon.innerHTML = '<path d="m5 10 3.2 3.2L15.5 6" />';
+    window.clearTimeout(shareResetTimer);
+    shareResetTimer = window.setTimeout(() => {
+      shareLabel.textContent = "Copy link";
+      shareIcon.innerHTML = '<path d="M7 13 13.5 6.5M9 5h6v6M14 11v4H5V6h4" />';
+    }, 1600);
   } catch (error) {
     console.error(error);
     status.textContent = "Copy the link from the address bar";
