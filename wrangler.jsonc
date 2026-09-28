@@ -26,6 +26,7 @@
   "routes": [
     {
       "pattern": "outmatch.lol",
+      "zone_name": "outmatch.lol",
       "custom_domain": true
     }
   ]
