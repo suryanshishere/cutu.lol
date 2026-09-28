@@ -713,7 +713,7 @@ async function shareVideo() {
     window.clearTimeout(shareResetTimer);
     shareResetTimer = window.setTimeout(() => {
       shareLabel.textContent = "Copy link";
-      shareIcon.innerHTML = '<path d="M7 13 13.5 6.5M9 5h6v6M14 11v4H5V6h4" />';
+      shareIcon.innerHTML = '<path d="m8 12 4-4m-5.3 6.3-1.4 1.4a3 3 0 0 1-4.2-4.2l2.4-2.4a3 3 0 0 1 4.2 0m3.6-3.6 1.4-1.4a3 3 0 0 1 4.2 4.2l-2.4 2.4a3 3 0 0 1-4.2 0" />';
     }, 1600);
   } catch (error) {
     console.error(error);
