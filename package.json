@@ -10,5 +10,8 @@
     "deploy": "npm run prepare:public && wrangler deploy",
     "start": "node server.mjs",
     "check": "node --check app.js && node --check server.mjs && node --check src/worker.js && node --check scripts/prepare-public.mjs"
+  },
+  "devDependencies": {
+    "wrangler": "^4.136.1"
   }
 }
