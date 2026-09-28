@@ -327,7 +327,7 @@ function drawFrame(elapsedSeconds, message, canvas = exportCanvas, context = exp
   const lineHeight = size * 0.94;
   const attributionSize = Math.max(20, size * 0.32);
   const attributionLineHeight = attributionSize * 1.1;
-  const attributionGap = attribution ? size * 0.3 : 0;
+  const attributionGap = attribution ? size * 0.45 : 0;
   const totalHeight = lineHeight * lines.length + attributionGap + (attribution ? attributionLineHeight : 0);
   const startY = height * 0.5 - totalHeight * 0.5 + size * 0.78;
 
