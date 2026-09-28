@@ -1,0 +1,14 @@
+{
+  "name": "outmatch",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node server.mjs",
+    "prepare:public": "node scripts/prepare-public.mjs",
+    "dev:cloudflare": "npm run prepare:public && wrangler dev",
+    "deploy": "npm run prepare:public && wrangler deploy",
+    "start": "node server.mjs",
+    "check": "node --check app.js && node --check server.mjs && node --check src/worker.js && node --check scripts/prepare-public.mjs"
+  }
+}

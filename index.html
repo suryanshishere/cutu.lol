@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#ffffff" />
+    <meta name="description" content="Put your words behind the hamster and download the video with sound." />
+    <title>outmatch.lol</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="masthead" aria-label="Visitor counts">
+        <div class="brand-name">outmatch.lol</div>
+        <div class="site-stats" aria-label="Site visitors">
+          <span class="visitor-stat visitor-stat-live" title="Live today">
+            <span class="live-dot" aria-hidden="true"></span>
+            <strong id="today-viewers">0</strong>
+            <span>live today</span>
+          </span>
+          <span class="stat-divider" aria-hidden="true"></span>
+          <span class="visitor-stat" title="Total visits">
+            <span class="eye-icon" aria-hidden="true"></span>
+            <strong id="total-visits">0</strong>
+            <span>total visits</span>
+          </span>
+        </div>
+      </header>
+
+      <section class="workspace">
+        <div class="composer">
+          <form id="text-form" class="text-form">
+            <label for="message">Type your text</label>
+            <div class="sketch-field">
+              <textarea
+                id="message"
+                name="message"
+                maxlength="120"
+                rows="4"
+                spellcheck="true"
+                aria-label="Video text"
+                placeholder="Type something..."
+              >Small steps. Big wheel energy.</textarea>
+              <input
+                id="attribution"
+                name="attribution"
+                class="attribution-input"
+                maxlength="48"
+                type="text"
+                autocomplete="off"
+                aria-label="Quote attribution"
+                placeholder="Name"
+              />
+            </div>
+            <p id="status" class="visually-hidden" role="status" aria-live="polite">Ready</p>
+          </form>
+        </div>
+
+        <div class="preview-column">
+          <div id="stage" class="stage" aria-label="Video preview">
+            <div id="preview-text" class="preview-text is-right">Small steps. Big wheel energy.</div>
+            <video
+              id="hamster-video"
+              class="hamster-video"
+              src="hamster-transparent.webm"
+              autoplay
+              muted
+              playsinline
+              preload="auto"
+            ></video>
+          </div>
+
+          <div class="preview-tools">
+            <a id="download-button" class="download-button" href="#" download="hamster-type.webm" aria-disabled="false">
+              <span>Download it</span>
+              <svg class="button-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M10 2v10m0 0 4-4m-4 4-4-4M3 16.5h14" /></svg>
+            </a>
+            <div class="tool-icons">
+              <button id="sound-button" class="sound-button icon-button" type="button" aria-pressed="false" aria-label="Turn sound on" title="Sound">
+                <svg id="sound-icon" class="button-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M3 8h3l4-3v10l-4-3H3zM13 7.2a4 4 0 0 1 0 5.6M15.4 5a7 7 0 0 1 0 10" /></svg>
+                <span id="sound-label">Sound off</span>
+              </button>
+              <button id="share-button" class="share-button icon-button" type="button" aria-label="Copy share link" title="Copy share link">
+                <svg class="button-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M7 13 13.5 6.5M9 5h6v6M14 11v4H5V6h4" /></svg>
+                <span>Share</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <canvas id="export-canvas" hidden></canvas>
+    <script type="module" src="app.js"></script>
+  </body>
+</html>
