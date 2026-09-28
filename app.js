@@ -14,6 +14,7 @@ const soundIcon = document.querySelector("#sound-icon");
 const shareButton = document.querySelector("#share-button");
 const shareLabel = document.querySelector("#share-label");
 const shareIcon = document.querySelector("#share-icon");
+const actionMessage = document.querySelector("#action-message");
 const exportCanvas = document.querySelector("#export-canvas");
 const exportContext = exportCanvas.getContext("2d", { alpha: false });
 const analysisCanvas = document.createElement("canvas");
@@ -47,6 +48,16 @@ let exportSlide = 0;
 let cleanEndFrame;
 let downloadResetTimer;
 let shareResetTimer;
+let actionMessageTimer;
+
+function showActionMessage(message) {
+  actionMessage.textContent = message;
+  actionMessage.classList.add("is-visible");
+  window.clearTimeout(actionMessageTimer);
+  actionMessageTimer = window.setTimeout(() => {
+    actionMessage.classList.remove("is-visible");
+  }, 1800);
+}
 
 function cleanMessage() {
   return messageInput.value.trim() || "Small steps. Big wheel energy.";
@@ -253,6 +264,7 @@ async function toggleSound() {
   soundIcon.innerHTML = soundEnabled
     ? '<path d="M3 8h3l4-3v10l-4-3H3zM13 7.2a4 4 0 0 1 0 5.6M15.4 5a7 7 0 0 1 0 10" />'
     : '<path d="M3 8h3l4-3v10l-4-3H3zM14 7l3 3m0 0-3 3" />';
+  showActionMessage(soundEnabled ? "Sound on" : "Sound off");
   soundButton.setAttribute("aria-label", soundEnabled ? "Turn sound off" : "Turn sound on");
   if (hamsterVideo.paused && !rendering) await hamsterVideo.play();
 }
@@ -550,6 +562,7 @@ function downloadVideo(event) {
   if (!renderedUrl) window.setTimeout(() => URL.revokeObjectURL(url), 1000);
   downloadLabel.textContent = "Downloaded";
   downloadIcon.innerHTML = '<path d="m5 10 3.2 3.2L15.5 6" />';
+  showActionMessage("Video downloaded");
   window.clearTimeout(downloadResetTimer);
   downloadResetTimer = window.setTimeout(() => {
     downloadLabel.textContent = "Download it";
@@ -708,6 +721,7 @@ async function shareVideo() {
       helper.remove();
     }
     status.textContent = "Link copied";
+    showActionMessage("Link copied");
     shareLabel.textContent = "Copied";
     shareIcon.innerHTML = '<path d="m5 10 3.2 3.2L15.5 6" />';
     window.clearTimeout(shareResetTimer);
@@ -718,6 +732,7 @@ async function shareVideo() {
   } catch (error) {
     console.error(error);
     status.textContent = "Copy the link from the address bar";
+    showActionMessage("Copy failed");
   }
 }
 

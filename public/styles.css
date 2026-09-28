@@ -877,6 +877,26 @@ textarea {
   transform: scale(0.98);
 }
 
+.action-message {
+  min-height: 1.1rem;
+  margin: 11px 0 0;
+  color: var(--soft-ink);
+  font-family: "Arial Narrow", "Avenir Next Condensed", "Segoe UI", sans-serif;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-align: center;
+  text-transform: uppercase;
+  opacity: 0;
+  transform: translateY(-3px);
+  transition: opacity 150ms ease, transform 150ms ease;
+}
+
+.action-message.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
 /* Let the sketch input sit cleanly on the white page without a second white
    rectangle inside the hand-drawn border. */
 textarea {
