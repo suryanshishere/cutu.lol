@@ -708,6 +708,7 @@ textarea {
 .preview-attribution {
   display: block;
   margin-top: 0.18em;
+  padding-right: 0.18em;
   font-size: 0.32em;
   line-height: 1.05;
   text-align: right;

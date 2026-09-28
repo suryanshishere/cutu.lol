@@ -336,7 +336,9 @@ function drawFrame(elapsedSeconds, message, canvas = exportCanvas, context = exp
     const attributionEase = 1 - Math.pow(1 - attributionProgress, 3);
     context.font = `700 ${attributionSize}px Georgia, "Times New Roman", serif`;
     context.textAlign = desiredSlide < 0.5 ? "right" : "left";
-    const attributionX = desiredSlide < 0.5 ? width * 0.915 : width * 0.085;
+    // Inset the attribution from the canvas edge so it sits beneath the
+    // quote block instead of floating too far right.
+    const attributionX = desiredSlide < 0.5 ? width * 0.855 : width * 0.145;
     context.globalAlpha = attributionEase;
     context.fillText(`— ${attribution}`, attributionX, startY + lines.length * lineHeight + attributionGap + attributionSize);
   }
