@@ -9,7 +9,9 @@ const contentTypes = {
   ".css": "text/css; charset=utf-8",
   ".js": "text/javascript; charset=utf-8",
   ".webm": "video/webm",
-  ".svg": "image/svg+xml"
+  ".svg": "image/svg+xml",
+  ".txt": "text/plain; charset=utf-8",
+  ".xml": "application/xml; charset=utf-8"
 };
 
 createServer((request, response) => {

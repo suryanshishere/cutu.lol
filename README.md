@@ -1,6 +1,6 @@
 # outmatch.lol
 
-A minimal browser editor that places animated text behind the supplied transparent hamster clip and exports a 1080p WebM with the original audio. Cloudflare Durable Object storage powers the persistent live-today and total-visit counters.
+A browser editor that places your message and name behind the transparent hamster and exports a 1080p WebM with sound. The clean clip removes the source video's white opening flash and baked closing words. Cloudflare Durable Object storage powers the persistent today and total visit counters.
 
 ## Run
 
