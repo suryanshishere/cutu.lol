@@ -356,10 +356,10 @@ function drawFrame(elapsedSeconds, message, canvas = exportCanvas, context = exp
     const attributionProgress = Math.max(0, Math.min(1, (elapsedSeconds - lines.length * 0.1) / 0.55));
     const attributionEase = 1 - Math.pow(1 - attributionProgress, 3);
     context.font = `700 ${attributionSize}px Georgia, "Times New Roman", serif`;
-    context.textAlign = desiredSlide < 0.5 ? "right" : "left";
-    // Inset the attribution from the canvas edge so it sits beneath the
-    // quote block instead of floating too far right.
-    const attributionX = desiredSlide < 0.5 ? width * 0.855 : width * 0.145;
+    context.textAlign = "center";
+    // Center the attribution beneath the quote block instead of letting it
+    // hug the outer canvas edge.
+    const attributionX = desiredSlide < 0.5 ? width * 0.76 : width * 0.24;
     context.globalAlpha = attributionEase;
     context.fillText(`— ${attribution}`, attributionX, startY + lines.length * lineHeight + attributionGap + attributionSize);
   }
