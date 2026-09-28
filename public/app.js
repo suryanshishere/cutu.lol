@@ -160,7 +160,7 @@ function updateLivePreview() {
     previewText.append(document.createElement("br"));
     const attributionNode = document.createElement("span");
     attributionNode.className = "preview-attribution";
-    attributionNode.textContent = `— ${attribution}`;
+    attributionNode.textContent = `—\u00a0\u00a0${attribution}`;
     previewText.append(attributionNode);
   }
   restartTextAnimation();
@@ -361,7 +361,7 @@ function drawFrame(elapsedSeconds, message, canvas = exportCanvas, context = exp
     // hug the outer canvas edge.
     const attributionX = desiredSlide < 0.5 ? width * 0.76 : width * 0.24;
     context.globalAlpha = attributionEase;
-    context.fillText(`— ${attribution}`, attributionX, startY + lines.length * lineHeight + attributionGap + attributionSize);
+    context.fillText(`—\u00a0\u00a0${attribution}`, attributionX, startY + lines.length * lineHeight + attributionGap + attributionSize);
   }
 
   context.globalAlpha = 1;
