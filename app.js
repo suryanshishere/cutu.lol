@@ -14,6 +14,8 @@ const soundIcon = document.querySelector("#sound-icon");
 const shareButton = document.querySelector("#share-button");
 const shareLabel = document.querySelector("#share-label");
 const shareIcon = document.querySelector("#share-icon");
+const characterStamp = document.querySelector("#character-stamp");
+const characterStampVideo = characterStamp.querySelector("video");
 const actionMessage = document.querySelector("#action-message");
 const exportCanvas = document.querySelector("#export-canvas");
 const exportContext = exportCanvas.getContext("2d", { alpha: false });
@@ -21,13 +23,18 @@ const analysisCanvas = document.createElement("canvas");
 analysisCanvas.width = 96;
 analysisCanvas.height = 54;
 const analysisContext = analysisCanvas.getContext("2d", { willReadFrequently: true });
+const cleanFrameCanvas = document.createElement("canvas");
+const cleanFrameContext = cleanFrameCanvas.getContext("2d", { willReadFrequently: true });
+let cleanVisited = new Uint8Array(0);
+let cleanQueue = new Int32Array(0);
 const todayViewers = document.querySelector("#today-viewers");
 const totalVisits = document.querySelector("#total-visits");
 const siteStats = document.querySelector(".site-stats");
 
 const OUTPUT_LONG_EDGE = 1920;
-// Skip the remaining white/transition frames at the very beginning.
-const CLEAN_VIDEO_START = 1;
+// Keep the complete source timeline. Background cleanup removes the light
+// matte without dropping the opening frames.
+const CLEAN_VIDEO_START = 0;
 // Keep the full source timeline. The clean frame just before the baked
 // end-card is held over that interval instead of trimming the export.
 const CLEAN_CONTENT_END = 11.78;
@@ -60,7 +67,7 @@ function showActionMessage(message) {
 }
 
 function cleanMessage() {
-  return messageInput.value.trim() || "Small steps. Big wheel energy.";
+  return messageInput.value.trim();
 }
 
 function cleanAttribution() {
@@ -153,9 +160,62 @@ function syncTextToCharacter() {
   if (nextSide !== textSide) setTextSide(nextSide);
 }
 
+function cleanVideoFrame(sourceFrame, width, height) {
+  if (cleanFrameCanvas.width !== width || cleanFrameCanvas.height !== height) {
+    cleanFrameCanvas.width = width;
+    cleanFrameCanvas.height = height;
+  }
+  cleanFrameContext.clearRect(0, 0, width, height);
+  cleanFrameContext.drawImage(sourceFrame, 0, 0, width, height);
+
+  const image = cleanFrameContext.getImageData(0, 0, width, height);
+  const pixels = image.data;
+  const pixelCount = width * height;
+  if (cleanVisited.length !== pixelCount) cleanVisited = new Uint8Array(pixelCount);
+  if (cleanQueue.length !== pixelCount) cleanQueue = new Int32Array(pixelCount);
+  cleanVisited.fill(0);
+  const visited = cleanVisited;
+  const queue = cleanQueue;
+  let head = 0;
+  let tail = 0;
+  const isMatte = (index) => {
+    const offset = index * 4;
+    if (pixels[offset + 3] < 8) return true;
+    const red = pixels[offset];
+    const green = pixels[offset + 1];
+    const blue = pixels[offset + 2];
+    return red > 238 && green > 238 && blue > 238 && Math.max(red, green, blue) - Math.min(red, green, blue) < 18;
+  };
+  const seed = (index) => {
+    if (visited[index] || !isMatte(index)) return;
+    visited[index] = 1;
+    queue[tail++] = index;
+  };
+  for (let x = 0; x < width; x += 1) {
+    seed(x);
+    seed((height - 1) * width + x);
+  }
+  for (let y = 1; y < height - 1; y += 1) {
+    seed(y * width);
+    seed(y * width + width - 1);
+  }
+  while (head < tail) {
+    const index = queue[head++];
+    const x = index % width;
+    const y = (index - x) / width;
+    pixels[index * 4 + 3] = 0;
+    if (x > 0) seed(index - 1);
+    if (x + 1 < width) seed(index + 1);
+    if (y > 0) seed(index - width);
+    if (y + 1 < height) seed(index + width);
+  }
+  cleanFrameContext.putImageData(image, 0, 0);
+  return cleanFrameCanvas;
+}
+
 function updateLivePreview() {
   previewText.replaceChildren(document.createTextNode(cleanMessage()));
-  const attribution = cleanAttribution();
+  const attribution = cleanMessage() ? cleanAttribution() : "";
   if (attribution) {
     previewText.append(document.createElement("br"));
     const attributionNode = document.createElement("span");
@@ -314,7 +374,7 @@ function wrapText(context, text, maxWidth) {
     lines.push(line);
   }
 
-  return lines.length ? lines : ["Small steps. Big wheel energy."];
+  return lines;
 }
 
 function drawFrame(elapsedSeconds, message, canvas = exportCanvas, context = exportContext) {
@@ -322,7 +382,7 @@ function drawFrame(elapsedSeconds, message, canvas = exportCanvas, context = exp
   const height = canvas.height;
   const fontBase = Math.min(width * 0.103, height * 0.16);
   const maxTextWidth = width * 0.64;
-  const attribution = cleanAttribution();
+  const attribution = message ? cleanAttribution() : "";
   const { lines, size } = fitText(context, message, maxTextWidth, 4, fontBase);
   const lineHeight = size * 0.94;
   const attributionSize = Math.max(20, size * 0.32);
@@ -373,7 +433,8 @@ function drawFrame(elapsedSeconds, message, canvas = exportCanvas, context = exp
   const sourceFrame = cleanEndFrame && hamsterVideo.currentTime >= CLEAN_CONTENT_END
     ? cleanEndFrame
     : hamsterVideo;
-  context.drawImage(sourceFrame, -width * 0.04, -height * 0.04, videoWidth, videoHeight);
+  const cleanedFrame = cleanVideoFrame(sourceFrame, width, height);
+  context.drawImage(cleanedFrame, -width * 0.04, -height * 0.04, videoWidth, videoHeight);
 }
 
 function getRecorderMimeType() {
@@ -750,6 +811,15 @@ hamsterVideo.addEventListener("seeked", syncTextToCharacter);
 window.addEventListener("resize", () => positionPreviewText(false));
 soundButton.addEventListener("click", toggleSound);
 shareButton.addEventListener("click", shareVideo);
+characterStampVideo.addEventListener("loadedmetadata", () => {
+  characterStampVideo.currentTime = Math.min(6.2, Math.max(0, characterStampVideo.duration * 0.5));
+});
+characterStampVideo.addEventListener("seeked", () => characterStampVideo.pause());
+characterStamp.addEventListener("click", () => {
+  characterStamp.classList.add("is-selected");
+  characterStamp.setAttribute("aria-pressed", "true");
+  showActionMessage("Hamster character selected");
+});
 downloadButton.addEventListener("click", downloadVideo);
 form.addEventListener("submit", (event) => event.preventDefault());
 
@@ -757,10 +827,8 @@ const sharedText = new URLSearchParams(location.search).get("text");
 const sharedName = new URLSearchParams(location.search).get("name");
 if (sharedText) messageInput.value = sharedText.slice(0, 240);
 if (sharedName) attributionInput.value = sharedName.slice(0, 48);
-if (sharedText || sharedName) {
-  updateLivePreview();
-  scheduleRender();
-}
+updateLivePreview();
+scheduleRender();
 updateStageRatio();
 monitorCleanPlayback();
 connectVisitorStats();

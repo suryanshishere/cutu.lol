@@ -898,6 +898,53 @@ textarea {
   transform: translateY(0);
 }
 
+.character-stamp {
+  display: inline-flex;
+  place-items: center;
+  justify-content: center;
+  width: 58px;
+  height: 40px;
+  min-width: 58px;
+  padding: 0 4px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--paper);
+  color: var(--soft-ink);
+  cursor: pointer;
+  transition: color 150ms ease, border-color 150ms ease, background 150ms ease, transform 150ms ease;
+}
+
+.character-stamp video {
+  width: 76px;
+  height: 76px;
+  object-fit: cover;
+  object-position: center;
+  transform: scale(1.35);
+  pointer-events: none;
+}
+
+.character-stamp:hover {
+  border-color: var(--ink);
+  background: #f8f7f4;
+  color: var(--ink);
+  transform: none;
+}
+
+.character-stamp:active {
+  transform: scale(0.98);
+}
+
+.character-stamp.is-selected {
+  border-color: var(--ink);
+  background: #f8f7f4;
+}
+
+.character-stamp:focus-visible {
+  outline: 3px solid var(--cheese);
+  outline-offset: 3px;
+}
+
 /* Let the sketch input sit cleanly on the white page without a second white
    rectangle inside the hand-drawn border. */
 textarea {
