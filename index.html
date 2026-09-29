@@ -3,79 +3,97 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#f8f6f0" />
-    <meta name="description" content="Make a little message with the dancing hamster. Add your words, sign your name, and download a video with sound." />
-    <link rel="canonical" href="https://outmatch.lol/" />
-    <meta property="og:type" content="website" />
-    <meta property="og:title" content="outmatch.lol — make a little hamster moment" />
-    <meta property="og:description" content="Your words. One very expressive hamster. Make and share the video." />
-    <meta property="og:url" content="https://outmatch.lol/" />
-    <title>outmatch.lol — make a little hamster moment</title>
+    <meta name="theme-color" content="#ffffff" />
+    <meta name="description" content="Put your words behind the hamster and download the video with sound." />
+    <title>outmatch.lol</title>
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
     <main class="app-shell">
-      <header class="masthead">
-        <a class="brand-name" href="/" aria-label="outmatch.lol home">outmatch<span>.lol</span></a>
+      <header class="masthead" aria-label="Visitor counts">
+        <div class="brand-name">outmatch.lol</div>
         <div class="site-stats" aria-label="Site visitors">
-          <span class="visitor-stat"><span class="live-dot" aria-hidden="true"></span><strong id="today-viewers">0</strong> today</span>
+          <span class="visitor-stat visitor-stat-live" title="Live today">
+            <span class="live-dot" aria-hidden="true"></span>
+            <strong id="today-viewers">0</strong>
+            <span>live today</span>
+          </span>
           <span class="stat-divider" aria-hidden="true"></span>
-          <span class="visitor-stat"><strong id="total-visits">0</strong> visits</span>
+          <span class="visitor-stat" title="Total visits">
+            <span class="eye-icon" aria-hidden="true"></span>
+            <strong id="total-visits">0</strong>
+            <span>total visits</span>
+          </span>
         </div>
       </header>
 
-      <section class="intro" aria-labelledby="page-title">
-        <div class="intro-copy">
-          <p class="eyebrow">The tiny video maker</p>
-          <h1 id="page-title">Say it with <em>hamster.</em></h1>
-          <p class="intro-detail">Add your words. He’ll do the rest.</p>
+      <section class="workspace">
+        <div class="composer">
+          <form id="text-form" class="text-form">
+            <label for="message">Type your text</label>
+            <div class="sketch-field">
+              <textarea
+                id="message"
+                name="message"
+                maxlength="120"
+                rows="4"
+                spellcheck="true"
+                aria-label="Video text"
+                placeholder="Type something..."
+              >Small steps. Big wheel energy.</textarea>
+              <input
+                id="attribution"
+                name="attribution"
+                class="attribution-input"
+                maxlength="48"
+                type="text"
+                autocomplete="off"
+                aria-label="Quote attribution"
+                placeholder="Name"
+              />
+            </div>
+            <p id="status" class="visually-hidden" role="status" aria-live="polite">Ready</p>
+          </form>
         </div>
-        <div class="postage-stamp" aria-label="Hamster postage stamp" role="img">
-          <div class="stamp-inner">
-            <span class="stamp-country">OUTMATCH.LOL</span>
-            <img src="hamster-stamp.png" alt="" width="240" height="240" />
-            <span class="stamp-value">one good day</span>
-          </div>
-        </div>
-      </section>
 
-      <section class="workspace" aria-label="Create your video">
         <div class="preview-column">
-          <div class="section-heading"><span>01 / Your video</span><span>9 seconds of joy</span></div>
           <div id="stage" class="stage" aria-label="Video preview">
-            <div id="preview-text" class="preview-text is-right" data-clarity-mask="true" aria-live="polite"></div>
-            <video id="hamster-video" class="hamster-video" src="hamster-clean.webm" autoplay muted playsinline preload="auto"></video>
+            <div id="preview-text" class="preview-text is-right"></div>
+            <video
+              id="hamster-video"
+              class="hamster-video"
+              src="hamster-transparent.webm"
+              autoplay
+              muted
+              playsinline
+              preload="auto"
+            ></video>
           </div>
+
           <div class="preview-tools">
-            <button id="download-button" class="download-button" type="button">
-              <span id="download-label">Download video</span>
+            <a id="download-button" class="download-button" href="#" download="hamster-type.webm" aria-disabled="false">
+              <span id="download-label">Download it</span>
               <svg id="download-icon" class="button-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M10 2v10m0 0 4-4m-4 4-4-4M3 16.5h14" /></svg>
-            </button>
+            </a>
             <div class="tool-icons">
-              <button id="sound-button" class="icon-button" type="button" aria-pressed="false" aria-label="Turn sound on">
-                <svg id="sound-icon" class="button-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M3 8h3l4-3v10l-4 3H3zM14 7l3 3m0 0-3 3" /></svg><span id="sound-label">Sound off</span>
+              <button id="sound-button" class="sound-button icon-button" type="button" aria-pressed="false" aria-label="Turn sound on" title="Sound">
+                <svg id="sound-icon" class="button-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M3 8h3l4-3v10l-4-3H3zM13 7.2a4 4 0 0 1 0 5.6M15.4 5a7 7 0 0 1 0 10" /></svg>
+                <span id="sound-label">Sound off</span>
               </button>
-              <button id="share-button" class="icon-button" type="button" aria-label="Copy share link">
-                <svg id="share-icon" class="button-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="m8 12 4-4m-5.3 6.3-1.4 1.4a3 3 0 0 1-4.2-4.2l2.4-2.4a3 3 0 0 1 4.2 0m3.6-3.6 1.4-1.4a3 3 0 0 1 4.2 4.2l-2.4 2.4a3 3 0 0 1-4.2 0" /></svg><span id="share-label">Copy link</span>
+              <button id="share-button" class="share-button icon-button" type="button" aria-label="Copy share link" title="Copy share link">
+                <svg id="share-icon" class="button-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="m8 12 4-4m-5.3 6.3-1.4 1.4a3 3 0 0 1-4.2-4.2l2.4-2.4a3 3 0 0 1 4.2 0m3.6-3.6 1.4-1.4a3 3 0 0 1 4.2 4.2l-2.4 2.4a3 3 0 0 1-4.2 0" /></svg>
+                <span id="share-label">Copy link</span>
+              </button>
+              <button id="character-stamp" class="character-stamp is-selected" type="button" aria-label="Select hamster character" title="Hamster character" aria-pressed="true">
+                <video src="hamster-transparent.webm" muted playsinline preload="auto" aria-hidden="true"></video>
               </button>
             </div>
           </div>
-          <p id="status" class="status" role="status" aria-live="polite">Ready to download</p>
-        </div>
-
-        <div class="composer">
-          <div class="section-heading"><span>02 / Make it yours</span></div>
-          <form id="text-form" class="text-form">
-            <label for="message">Your message <span>max 120 characters</span></label>
-            <textarea id="message" name="message" maxlength="120" rows="4" spellcheck="true" data-clarity-mask="true" placeholder="Type something worth sharing…">Small steps. Big wheel energy.</textarea>
-            <div class="field-foot"><span>Write a note, a joke, or a little pep talk.</span><span id="character-count">0 / 120</span></div>
-            <label for="attribution">Sign it <span>optional</span></label>
-            <input id="attribution" name="attribution" maxlength="36" type="text" autocomplete="off" data-clarity-mask="true" placeholder="Your name" />
-          </form>
-          <p class="composer-note">Your message appears in the video. The link lets someone make their own copy.</p>
+          <p id="action-message" class="action-message" role="status" aria-live="polite"></p>
         </div>
       </section>
     </main>
+
     <canvas id="export-canvas" hidden></canvas>
     <script type="module" src="app.js"></script>
   </body>

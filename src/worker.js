@@ -111,10 +111,6 @@ export class VisitCounter {
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
-    if (url.hostname === "www.outmatch.lol") {
-      url.hostname = "outmatch.lol";
-      return Response.redirect(url.toString(), 308);
-    }
 
     if (url.pathname === "/api/stats") {
       const id = env.VISIT_COUNTER.idFromName(SITE_COUNTER_NAME);
