@@ -265,34 +265,36 @@ async function renderVideo(value, signature) {
   const ended = new Promise((resolve) => hamsterVideo.addEventListener("ended", resolve, { once: true }));
   let frameHandle;
   let paintedFrames = 0;
+  let totalPaintMs = 0;
+  let maxPaintMs = 0;
   const started = performance.now();
   const paint = (now) => {
+    const paintStart = performance.now();
     drawFrame(layout, signature, (now - started) / 1000);
+    const paintMs = performance.now() - paintStart;
+    totalPaintMs += paintMs;
+    maxPaintMs = Math.max(maxPaintMs, paintMs);
     canvasTrack.requestFrame();
     paintedFrames += 1;
-    if (!hamsterVideo.ended) {
-      frameHandle = "requestVideoFrameCallback" in hamsterVideo
-        ? hamsterVideo.requestVideoFrameCallback(paint)
-        : requestAnimationFrame(paint);
-    }
   };
 
   try {
     recorder.start(250);
     paint(started);
+    frameHandle = window.setInterval(() => paint(performance.now()), 1000 / 30);
     await hamsterVideo.play();
     await ended;
-    if ("cancelVideoFrameCallback" in hamsterVideo) hamsterVideo.cancelVideoFrameCallback(frameHandle);
-    else cancelAnimationFrame(frameHandle);
+    window.clearInterval(frameHandle);
     drawFrame(layout, signature, hamsterVideo.duration);
     canvasTrack.requestFrame();
     await new Promise((resolve) => requestAnimationFrame(resolve));
     recorder.stop();
     await stopped;
     const blob = new Blob(chunks, { type: recorder.mimeType || "video/webm" });
-    if (!blob.size || paintedFrames < 90) throw new Error(`The recording captured only ${paintedFrames} frames over ${(performance.now() - started).toFixed(0)}ms.`);
+    if (!blob.size || paintedFrames < 90) throw new Error(`The recording captured only ${paintedFrames} frames over ${(performance.now() - started).toFixed(0)}ms. Paint total ${totalPaintMs.toFixed(0)}ms, max ${maxPaintMs.toFixed(0)}ms, page ${document.visibilityState}.`);
     return blob;
   } finally {
+    window.clearInterval(frameHandle);
     if (recorder.state !== "inactive") recorder.stop();
     videoStream.getTracks().forEach((track) => track.stop());
     // The audio destination is reused on later downloads. Stopping its track
