@@ -1,23 +1,32 @@
 import { createReadStream, existsSync, statSync } from "node:fs";
 import { createServer } from "node:http";
-import { extname, join, normalize } from "node:path";
+import { extname, resolve, sep } from "node:path";
 
 const port = Number(process.env.PORT || 4173);
-const root = process.cwd();
+const root = resolve("site");
 const contentTypes = {
   ".html": "text/html; charset=utf-8",
   ".css": "text/css; charset=utf-8",
   ".js": "text/javascript; charset=utf-8",
   ".webm": "video/webm",
-  ".svg": "image/svg+xml"
+  ".svg": "image/svg+xml",
+  ".png": "image/png",
+  ".txt": "text/plain; charset=utf-8",
+  ".xml": "application/xml; charset=utf-8"
 };
 
 createServer((request, response) => {
-  const pathname = decodeURIComponent(new URL(request.url, `http://${request.headers.host}`).pathname);
+  let pathname;
+  try {
+    pathname = decodeURIComponent(new URL(request.url, "http://localhost").pathname);
+  } catch {
+    response.writeHead(400).end("Bad request");
+    return;
+  }
   const relativePath = pathname === "/" ? "index.html" : pathname.replace(/^\/+/, "");
-  const filePath = normalize(join(root, relativePath));
+  const filePath = resolve(root, relativePath);
 
-  if (!filePath.startsWith(root) || !existsSync(filePath) || !statSync(filePath).isFile()) {
+  if ((!filePath.startsWith(root + sep) && filePath !== root) || !existsSync(filePath) || !statSync(filePath).isFile()) {
     response.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });
     response.end("Not found");
     return;
@@ -28,9 +37,13 @@ createServer((request, response) => {
   const range = request.headers.range;
 
   if (range && type === "video/webm") {
-    const [startText, endText] = range.replace(/bytes=/, "").split("-");
-    const start = Number(startText);
-    const end = endText ? Number(endText) : stat.size - 1;
+    const match = /^bytes=(\d+)-(\d*)$/.exec(range);
+    const start = match ? Number(match[1]) : NaN;
+    const end = match && match[2] ? Number(match[2]) : stat.size - 1;
+    if (!Number.isSafeInteger(start) || !Number.isSafeInteger(end) || start >= stat.size || end < start || end >= stat.size) {
+      response.writeHead(416, { "Content-Range": `bytes */${stat.size}` }).end();
+      return;
+    }
     response.writeHead(206, {
       "Content-Type": type,
       "Content-Length": end - start + 1,

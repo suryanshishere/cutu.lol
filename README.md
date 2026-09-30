@@ -1,6 +1,6 @@
-# outmatch.lol
+# cutu.lol
 
-A minimal browser editor that places animated text behind the supplied transparent hamster clip and exports a 1080p WebM with the original audio. Cloudflare Durable Object storage powers the persistent live-today and total-visit counters.
+A browser based Baby Boo hamster meme maker. Add text, preview it over the looping hamster clip, then export a 1080p WebM with sound or copy a link that opens with your text. The live visit counter records each page load with one request to a Cloudflare Durable Object.
 
 ## Run
 
@@ -8,7 +8,7 @@ A minimal browser editor that places animated text behind the supplied transpare
 npm run dev
 ```
 
-Then open `http://127.0.0.1:4173` in Chrome, Edge, or Firefox. Video export uses the browser's `MediaRecorder` API.
+Then open `http://127.0.0.1:4173` in Chrome, Edge, or Firefox. Video export uses the browser's `MediaRecorder` API and begins only when Download is clicked.
 
 ## Cloudflare
 
@@ -17,4 +17,6 @@ npm run dev:cloudflare
 npm run deploy
 ```
 
-The Worker serves the static app, stores counters in a SQLite-backed Durable Object, streams live updates over WebSockets, and maps to `outmatch.lol` as a Cloudflare custom domain.
+The editable website lives in `site/`. The local server serves that directory directly. `npm run prepare:public` rebuilds the ignored `public/` deployment directory from it. `npm run deploy` checks the JavaScript, prepares the assets, and deploys with the locally authenticated Wrangler account. The Worker stores page-load counts in a SQLite-backed Durable Object and maps to `cutu.suryansh.lol` as a Cloudflare custom domain.
+
+Google Search Console verification, Google Analytics (`G-B04H26G5QT`), and Microsoft Clarity (`yqga817oq9`) are installed in `site/index.html`. The Search Console sitemap is at `/sitemap.xml`.

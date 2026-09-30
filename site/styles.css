@@ -27,10 +27,12 @@ body {
   min-width: 320px;
   min-height: 100vh;
   background: var(--paper);
+  isolation: isolate;
 }
 
 button,
-textarea {
+textarea,
+input {
   font: inherit;
 }
 
@@ -196,36 +198,26 @@ label {
   isolation: isolate;
 }
 
-.sketch-field::after {
-  content: "";
-  position: absolute;
-  z-index: -1;
-  inset: 7px -7px -7px 7px;
-  border: 1px dashed var(--line);
-  transform: rotate(0.35deg);
-}
-
 textarea {
   display: block;
   width: 100%;
   min-height: 118px;
   resize: none;
-  padding: 19px 52px 22px 20px;
+  padding: 18px 20px 20px;
   border: 2px solid var(--ink);
   border-radius: 3px 8px 4px 7px;
   outline: none;
   background: var(--paper);
   color: var(--ink);
-  font-family: "Segoe Print", "Bradley Hand", "Comic Sans MS", cursive;
-  font-size: clamp(1rem, 1.5vw, 1.25rem);
-  line-height: 1.45;
-  box-shadow: 0 0 0 0 var(--cheese);
-  transition: box-shadow 160ms ease, transform 160ms ease;
+  font-family: "Avenir Next", Avenir, "Segoe UI", sans-serif;
+  font-size: 1.05rem;
+  line-height: 1.5;
+  box-shadow: none;
+  transition: transform 160ms ease;
 }
 
 textarea:focus-visible {
-  box-shadow: 5px 5px 0 var(--cheese);
-  transform: translate(-2px, -2px);
+  transform: none;
 }
 
 textarea::placeholder {
@@ -477,6 +469,7 @@ textarea {
   padding: 22px;
 }
 
+
 .stage {
   border-color: #eceae5;
   background: var(--paper);
@@ -705,17 +698,6 @@ textarea {
   animation: text-ink 240ms ease-out;
 }
 
-.preview-attribution {
-  display: block;
-  margin-top: 0.48em;
-  padding-right: 0;
-  word-spacing: 0.28em;
-  font-size: 0.32em;
-  line-height: 1.05;
-  text-align: center;
-  white-space: nowrap;
-}
-
 .masthead {
   flex-direction: column;
   align-items: center;
@@ -726,7 +708,7 @@ textarea {
 .brand-name {
   color: var(--ink);
   font-family: "Brush Script MT", "Segoe Script", "Snell Roundhand", cursive;
-  font-size: 1.05rem;
+  font-size: 1.3rem;
   font-weight: 600;
   letter-spacing: 0.02em;
   line-height: 1;
@@ -955,36 +937,6 @@ textarea {
   appearance: none;
 }
 
-.attribution-input {
-  position: absolute;
-  right: 12px;
-  bottom: 10px;
-  z-index: 1;
-  width: min(42%, 150px);
-  height: 28px;
-  padding: 0 9px;
-  border: 1px dashed var(--line);
-  border-radius: 3px 6px 4px 5px;
-  outline: none;
-  background: rgb(255 255 255 / 72%);
-  background: color-mix(in srgb, var(--paper) 72%, transparent);
-  color: var(--soft-ink);
-  font-family: "Segoe Print", "Bradley Hand", "Comic Sans MS", cursive;
-  font-size: 0.72rem;
-  line-height: 1;
-  transition: border-color 150ms ease, box-shadow 150ms ease, transform 150ms ease;
-}
-
-.attribution-input::placeholder {
-  color: #aaa69d;
-}
-
-.attribution-input:focus-visible {
-  border-color: var(--ink);
-  box-shadow: 3px 3px 0 var(--cheese);
-  transform: translate(-1px, -1px);
-}
-
 @keyframes text-ink {
   from { opacity: 0.35; }
   to { opacity: 1; }
@@ -1124,4 +1076,181 @@ textarea {
 
 .text-form {
   width: 100%;
+}
+
+.app-shell {
+  position: relative;
+  z-index: 1;
+  background: var(--paper);
+}
+
+h1 {
+  max-width: none;
+  font-size: clamp(2.1rem, 5vw, 3.7rem);
+  line-height: 1;
+  letter-spacing: -0.05em;
+}
+
+.intro-copy {
+  max-width: 52ch;
+  margin: 12px 0 0;
+  color: var(--soft-ink);
+  font-size: 0.95rem;
+  line-height: 1.55;
+}
+
+textarea,
+.text-measure {
+  font-family: "Avenir Next", Avenir, "Segoe UI", sans-serif;
+  font-size: 1.05rem;
+  line-height: 1.5;
+}
+
+
+textarea {
+  min-height: 118px;
+  padding: 18px 20px 20px;
+  resize: none;
+}
+
+.text-measure {
+  position: absolute;
+  inset: 0 auto auto 0;
+  z-index: -1;
+  width: 100%;
+  min-height: 118px;
+  padding: 18px 20px 20px;
+  border: 2px solid transparent;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.character-stamp {
+  width: 40px;
+  height: 40px;
+  min-width: 40px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.character-stamp img {
+  display: block;
+  width: 32px;
+  height: 40px;
+  object-fit: contain;
+}
+
+.character-stamp:hover,
+.character-stamp.is-selected {
+  background: transparent;
+}
+
+.stage {
+  background: var(--paper);
+  box-shadow: 0 16px 42px rgb(27 25 19 / 5%);
+}
+
+.stage {
+  cursor: pointer;
+  min-height: 0;
+}
+
+.preview-text,
+.preview-text.is-right,
+.preview-text.is-left {
+  max-width: none;
+  white-space: pre;
+  overflow-wrap: normal;
+  letter-spacing: normal;
+}
+
+.preview-text.is-right {
+  text-align: right;
+}
+
+.preview-text.is-left {
+  text-align: left;
+}
+
+.stage-controls {
+  position: absolute;
+  z-index: 4;
+  top: 14px;
+  right: 14px;
+  display: flex;
+  gap: 8px;
+  opacity: 0;
+  transform: translateY(-4px);
+  transition: opacity 150ms ease, transform 150ms ease;
+  pointer-events: none;
+}
+
+.stage:hover .stage-controls,
+.stage:focus-within .stage-controls,
+.stage.is-paused .stage-controls {
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+}
+
+.stage-control {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: rgb(255 255 255 / 92%);
+  color: var(--ink);
+  cursor: pointer;
+  box-shadow: 0 2px 10px rgb(27 25 19 / 10%);
+}
+
+.stage-control:hover {
+  background: var(--paper);
+  border-color: var(--ink);
+}
+
+.stage-control:focus-visible {
+  outline: 3px solid var(--cheese);
+  outline-offset: 3px;
+}
+
+.preview-tools {
+  flex-direction: row;
+  justify-content: space-between;
+}
+
+.output-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+@media (hover: none) {
+  .stage-controls {
+    opacity: 1;
+    transform: none;
+    pointer-events: auto;
+  }
+}
+
+@media (max-width: 480px) {
+  .stage-controls {
+    top: 8px;
+    right: 8px;
+  }
+
+  .preview-tools {
+    gap: 8px;
+  }
+
+  .output-actions {
+    gap: 6px;
+  }
 }

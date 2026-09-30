@@ -17,17 +17,14 @@ export class VisitCounter {
   }
 
   async fetch(request) {
-    const url = new URL(request.url);
-    const isWebSocket = request.headers.get("Upgrade")?.toLowerCase() === "websocket";
-
-    if (isWebSocket) {
-      const sessionId = url.searchParams.get("session")?.slice(0, 96);
-      if (!sessionId) return new Response("Missing session", { status: 400 });
-      return this.connect(sessionId);
-    }
-
     if (request.method === "GET") {
       return Response.json(await this.readCounts(), {
+        headers: { "Cache-Control": "no-store" }
+      });
+    }
+
+    if (request.method === "POST") {
+      return Response.json(await this.recordVisit(), {
         headers: { "Cache-Control": "no-store" }
       });
     }
@@ -35,37 +32,14 @@ export class VisitCounter {
     return new Response("Method not allowed", { status: 405 });
   }
 
-  async connect(sessionId) {
-    const now = Date.now();
-    const sessionKey = `session:${sessionId}`;
-    const existing = await this.state.storage.get(sessionKey);
-
-    if (!existing) {
-      await this.state.storage.transaction(async (storage) => {
-        const duplicate = await storage.get(sessionKey);
-        if (duplicate) return;
-
-        const day = indiaDateKey();
-        const total = (await storage.get("total")) || 0;
-        const today = (await storage.get(`day:${day}`)) || 0;
-        await storage.put({
-          [sessionKey]: now,
-          total: total + 1,
-          [`day:${day}`]: today + 1
-        });
-      });
-    }
-
-    const pair = new WebSocketPair();
-    const [client, server] = Object.values(pair);
-    this.state.acceptWebSocket(server);
-    server.serializeAttachment({ sessionId, connectedAt: now });
-
-    const counts = await this.readCounts();
-    this.broadcast(counts);
-    this.state.waitUntil(this.cleanupSessions(now));
-
-    return new Response(null, { status: 101, webSocket: client });
+  async recordVisit() {
+    const day = indiaDateKey();
+    await this.state.storage.transaction(async (storage) => {
+      const total = (await storage.get("total")) || 0;
+      const today = (await storage.get(`day:${day}`)) || 0;
+      await storage.put({ total: total + 1, [`day:${day}`]: today + 1 });
+    });
+    return this.readCounts();
   }
 
   async readCounts() {
@@ -78,43 +52,36 @@ export class VisitCounter {
     };
   }
 
-  broadcast(counts) {
-    const message = JSON.stringify(counts);
-    for (const socket of this.state.getWebSockets()) {
-      try {
-        socket.send(message);
-      } catch {
-        // Cloudflare removes closed sockets from subsequent getWebSockets calls.
-      }
-    }
-  }
-
-  async cleanupSessions(now) {
-    if (Math.random() > 0.04) return;
-    const sessions = await this.state.storage.list({ prefix: "session:" });
-    const cutoff = now - 86_400_000;
-    const expired = [...sessions.entries()]
-      .filter(([, createdAt]) => createdAt < cutoff)
-      .map(([key]) => key);
-    if (expired.length) await this.state.storage.delete(expired);
-  }
-
-  webSocketMessage(socket, message) {
-    if (message === "ping") socket.send("pong");
-  }
-
-  webSocketClose() {}
-
-  webSocketError() {}
 }
 
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
 
-    if (url.pathname === "/api/stats") {
+    const isPageLoad = request.method === "GET" && (url.pathname === "/" || url.pathname === "/index.html");
+    if (isPageLoad) {
       const id = env.VISIT_COUNTER.idFromName(SITE_COUNTER_NAME);
-      return env.VISIT_COUNTER.get(id).fetch(request);
+      const counter = env.VISIT_COUNTER.get(id);
+      const [assetResponse, countResponse] = await Promise.all([
+        env.ASSETS.fetch(request),
+        counter.fetch("https://visit-counter/", { method: "POST" })
+      ]);
+      const counts = await countResponse.json();
+      if (!assetResponse.ok || !assetResponse.headers.get("content-type")?.includes("text/html")) {
+        return assetResponse;
+      }
+
+      const html = await assetResponse.text();
+      const stats = `<script>window.__VISIT_STATS__=${JSON.stringify(counts)};</script>`;
+      const headers = new Headers(assetResponse.headers);
+      headers.delete("content-length");
+      headers.delete("etag");
+      headers.set("Cache-Control", "no-store");
+      return new Response(html.replace("</head>", `${stats}</head>`), {
+        status: assetResponse.status,
+        statusText: assetResponse.statusText,
+        headers
+      });
     }
 
     return env.ASSETS.fetch(request);
