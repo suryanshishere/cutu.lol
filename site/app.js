@@ -6,9 +6,12 @@ const hamsterVideo = document.querySelector("#hamster-video");
 const exportVideo = document.querySelector("#export-video");
 const textMeasure = document.querySelector("#text-measure");
 const status = document.querySelector("#status");
+const downloadToggle = document.querySelector("#download-toggle");
+const downloadMenu = document.querySelector("#download-menu");
 const downloadButton = document.querySelector("#download-button");
 const downloadLabel = document.querySelector("#download-label");
-const downloadIcon = document.querySelector("#download-icon");
+const gifDownloadButton = document.querySelector("#gif-download-button");
+const gifDownloadLabel = document.querySelector("#gif-download-label");
 const soundButton = document.querySelector("#sound-button");
 const soundLabel = document.querySelector("#sound-label");
 const soundIcon = document.querySelector("#sound-icon");
@@ -33,9 +36,12 @@ const siteStats = document.querySelector(".site-stats");
 
 const DESKTOP_LONG_EDGE = 960;
 const MOBILE_LONG_EDGE = 720;
+const GIF_LONG_EDGE = 480;
+const GIF_FPS = 10;
 // Keep the complete source timeline; the WebM already has a transparent matte.
 const CLEAN_VIDEO_START = 0;
 let renderedUrl = "";
+let renderedGifUrl = "";
 let rendering = false;
 let soundEnabled = true;
 let soundUnlocked = false;
@@ -48,9 +54,12 @@ let recorderAudioDestination;
 let monitorGain;
 let renderedBlob;
 let renderedFilename = "hamster-type.mp4";
+let renderedGifBlob;
+let gifVersion = -1;
 let messageVersion = 0;
 let renderPending = false;
 let downloadPending = false;
+let gifDownloadPending = false;
 let exportSlide = 0;
 let cleanEndFrame;
 let downloadResetTimer;
@@ -59,13 +68,32 @@ let actionMessageTimer;
 let editingText = false;
 let manuallyPaused = false;
 
-function showActionMessage(message) {
+function setDownloadMenu(open) {
+  downloadMenu.hidden = !open;
+  downloadToggle.setAttribute("aria-expanded", String(open));
+}
+
+function showActionMessage(message, duration = 1800) {
   actionMessage.textContent = message;
   actionMessage.classList.add("is-visible");
+  actionMessage.classList.toggle("is-guidance", duration !== 1800);
   window.clearTimeout(actionMessageTimer);
-  actionMessageTimer = window.setTimeout(() => {
-    actionMessage.classList.remove("is-visible");
-  }, 1800);
+  if (duration) {
+    actionMessageTimer = window.setTimeout(() => {
+      actionMessage.classList.remove("is-visible");
+    }, duration);
+  }
+}
+
+function isTwitterInAppBrowser() {
+  return /Twitter/i.test(navigator.userAgent);
+}
+
+function showSwitchBrowserMessage() {
+  setDownloadMenu(false);
+  const message = "X may block downloads here. Open this page in Safari or Chrome to save your file.";
+  status.textContent = message;
+  showActionMessage(message, 0);
 }
 
 function cleanMessage() {
@@ -162,8 +190,6 @@ function updateLivePreview() {
   textMeasure.style.height = messageInput.style.height;
   restartTextAnimation();
   messageVersion += 1;
-  downloadButton.classList.remove("is-disabled");
-  downloadButton.setAttribute("aria-disabled", "false");
   shareButton.disabled = false;
 
   if (renderedUrl) {
@@ -171,8 +197,16 @@ function updateLivePreview() {
     renderedUrl = "";
     renderedBlob = undefined;
     downloadButton.href = "#";
-    status.textContent = "Ready to export";
   }
+  if (renderedGifUrl) {
+    URL.revokeObjectURL(renderedGifUrl);
+    renderedGifUrl = "";
+    renderedGifBlob = undefined;
+    gifDownloadButton.href = "#";
+  }
+  downloadLabel.textContent = "Video";
+  gifDownloadLabel.textContent = "GIF";
+  actionMessage.classList.remove("is-visible");
   updateShareLabel();
   if (!rendering) status.textContent = "Ready to export";
 }
@@ -380,7 +414,7 @@ function layoutPreviewText() {
   positionPreviewText(false);
 }
 
-function drawFrame(elapsedSeconds, message, canvas = exportCanvas, context = exportContext) {
+function drawFrame(elapsedSeconds, message, canvas = exportCanvas, context = exportContext, slideEasing = 0.16) {
   const width = canvas.width;
   const height = canvas.height;
   const { lines, widths, size, lineHeight } = layoutText(context, message, width, height);
@@ -406,7 +440,7 @@ function drawFrame(elapsedSeconds, message, canvas = exportCanvas, context = exp
   context.fillStyle = "#171714";
 
   const desiredSlide = sideOppositeCharacter() === "left" ? 1 : 0;
-  exportSlide += (desiredSlide - exportSlide) * 0.16;
+  exportSlide += (desiredSlide - exportSlide) * slideEasing;
   context.textAlign = "left";
 
   lines.forEach((line, index) => {
@@ -542,6 +576,35 @@ function setBusy(isBusy) {
   status.textContent = isBusy ? "Loading video for export" : "Ready";
 }
 
+async function prepareExportCanvas(longEdge) {
+  exportVideo.load();
+  if (exportVideo.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) {
+    await new Promise((resolve, reject) => {
+      exportVideo.addEventListener("loadeddata", resolve, { once: true });
+      exportVideo.addEventListener("error", reject, { once: true });
+    });
+  }
+
+  const sourceWidth = exportVideo.videoWidth || 1080;
+  const sourceHeight = exportVideo.videoHeight || 1080;
+  const duration = exportVideo.duration || 9;
+  const scale = longEdge / Math.max(sourceWidth, sourceHeight);
+  exportCanvas.width = Math.max(2, Math.round(sourceWidth * scale / 2) * 2);
+  exportCanvas.height = Math.max(2, Math.round(sourceHeight * scale / 2) * 2);
+  exportSlide = 0;
+
+  exportVideo.loop = false;
+  exportVideo.pause();
+  await seekVideo(Math.max(0, duration - 0.08), exportVideo);
+  cleanEndFrame = document.createElement("canvas");
+  cleanEndFrame.width = sourceWidth;
+  cleanEndFrame.height = sourceHeight;
+  cleanEndFrame.getContext("2d", { alpha: true }).drawImage(exportVideo, 0, 0, sourceWidth, sourceHeight);
+  await seekVideo(CLEAN_VIDEO_START, exportVideo);
+  setTextSide("right", false);
+  return duration;
+}
+
 async function makeVideo(event) {
   event?.preventDefault();
   if (rendering) {
@@ -551,15 +614,16 @@ async function makeVideo(event) {
 
   if (!window.MediaRecorder || !exportCanvas.captureStream) {
     status.classList.add("is-error");
-    status.textContent = "Video export is not supported in this browser";
+    status.textContent = "Video export is not supported in this browser. Open this page in Safari or Chrome.";
+    showActionMessage("Open this page in Safari or Chrome to download your video.", 0);
     downloadPending = false;
-    downloadLabel.textContent = "Download it";
+    downloadLabel.textContent = "Video";
     downloadButton.removeAttribute("aria-busy");
     return;
   }
 
   setBusy(true);
-  downloadLabel.textContent = "Preparing…";
+  downloadLabel.textContent = "Preparing video…";
   downloadButton.setAttribute("aria-busy", "true");
   const renderVersion = messageVersion;
   const message = cleanMessage();
@@ -570,32 +634,8 @@ async function makeVideo(event) {
 
   try {
     await prepareAudio();
-    exportVideo.load();
-    if (exportVideo.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) {
-      await new Promise((resolve, reject) => {
-        exportVideo.addEventListener("loadeddata", resolve, { once: true });
-        exportVideo.addEventListener("error", reject, { once: true });
-      });
-    }
-
-    const sourceWidth = exportVideo.videoWidth || 1080;
-    const sourceHeight = exportVideo.videoHeight || 1080;
-    const duration = exportVideo.duration || 9;
     const mobile = mobileSaveNeedsTap();
-    const scale = (mobile ? MOBILE_LONG_EDGE : DESKTOP_LONG_EDGE) / Math.max(sourceWidth, sourceHeight);
-    exportCanvas.width = Math.max(2, Math.round(sourceWidth * scale / 2) * 2);
-    exportCanvas.height = Math.max(2, Math.round(sourceHeight * scale / 2) * 2);
-    exportSlide = 0;
-
-    exportVideo.loop = false;
-    exportVideo.pause();
-    await seekVideo(Math.max(0, duration - 0.08), exportVideo);
-    cleanEndFrame = document.createElement("canvas");
-    cleanEndFrame.width = sourceWidth;
-    cleanEndFrame.height = sourceHeight;
-    cleanEndFrame.getContext("2d", { alpha: true }).drawImage(exportVideo, 0, 0, sourceWidth, sourceHeight);
-    await seekVideo(CLEAN_VIDEO_START, exportVideo);
-    setTextSide("right", false);
+    const duration = await prepareExportCanvas(mobile ? MOBILE_LONG_EDGE : DESKTOP_LONG_EDGE);
 
     canvasStream = exportCanvas.captureStream(30);
     combinedStream = new MediaStream([
@@ -688,9 +728,9 @@ async function makeVideo(event) {
     console.error(error);
     downloadPending = false;
     renderPending = false;
-    downloadLabel.textContent = "Download it";
+    downloadLabel.textContent = "Video";
     downloadButton.removeAttribute("aria-busy");
-    showActionMessage("Video export failed");
+    showActionMessage("Video export failed. Open this page in Safari or Chrome if it keeps failing.", 0);
     status.classList.remove("is-busy");
     status.classList.add("is-error");
     status.textContent = "Couldn’t render—try again";
@@ -710,7 +750,92 @@ async function makeVideo(event) {
   }
 }
 
+async function makeGif() {
+  if (rendering) {
+    showActionMessage("An export is already rendering");
+    return;
+  }
+
+  setBusy(true);
+  gifDownloadLabel.textContent = "Preparing GIF…";
+  gifDownloadButton.setAttribute("aria-busy", "true");
+  const renderVersion = messageVersion;
+  const message = cleanMessage();
+
+  try {
+    const { GIFEncoder, quantize, applyPalette } = await import("./vendor/gifenc.esm.js");
+    const duration = await prepareExportCanvas(GIF_LONG_EDGE);
+    const frameCount = Math.max(1, Math.ceil(duration * GIF_FPS));
+    const gif = GIFEncoder();
+
+    for (let frame = 0; frame < frameCount; frame += 1) {
+      const time = Math.min(Math.max(0, duration - 0.04), frame / GIF_FPS);
+      await seekVideo(time, exportVideo);
+      drawFrame(time, message, exportCanvas, exportContext, 0.4);
+      const pixels = exportContext.getImageData(0, 0, exportCanvas.width, exportCanvas.height).data;
+      const palette = quantize(pixels, 256);
+      const indexed = applyPalette(pixels, palette);
+      gif.writeFrame(indexed, exportCanvas.width, exportCanvas.height, {
+        palette,
+        delay: 1000 / GIF_FPS,
+        repeat: 0
+      });
+      if (frame % GIF_FPS === 0) {
+        const progress = Math.round(frame / frameCount * 100);
+        status.textContent = `Rendering GIF ${progress}%`;
+        gifDownloadLabel.textContent = `GIF ${progress}%`;
+        await new Promise((resolve) => window.setTimeout(resolve, 0));
+      }
+    }
+
+    gif.finish();
+    const bytes = gif.bytes();
+    if (bytes.length < 100) throw new Error("GIF export is empty");
+    const blob = new Blob([bytes], { type: "image/gif" });
+    if (renderVersion === messageVersion) {
+      if (renderedGifUrl) URL.revokeObjectURL(renderedGifUrl);
+      renderedGifBlob = blob;
+      renderedGifUrl = URL.createObjectURL(blob);
+      gifVersion = renderVersion;
+      gifDownloadButton.href = renderedGifUrl;
+      gifDownloadLabel.textContent = mobileSaveNeedsTap() ? "Save GIF" : "GIF";
+      status.textContent = mobileSaveNeedsTap() ? "GIF ready. Tap Save GIF." : "GIF ready";
+      gifDownloadButton.removeAttribute("aria-busy");
+      if (gifDownloadPending) {
+        gifDownloadPending = false;
+        if (mobileSaveNeedsTap()) showActionMessage("Ready — tap Save GIF");
+        else saveRenderedFile(renderedGifUrl, "hamster-type.gif", gifDownloadLabel);
+      }
+    } else {
+      gifDownloadPending = false;
+      gifDownloadLabel.textContent = "GIF";
+      gifDownloadButton.removeAttribute("aria-busy");
+      status.textContent = "Text changed — ready to export";
+    }
+    status.classList.remove("is-busy");
+  } catch (error) {
+    console.error(error);
+    gifDownloadPending = false;
+    gifDownloadLabel.textContent = "GIF";
+    gifDownloadButton.removeAttribute("aria-busy");
+    showActionMessage("GIF export failed. Open this page in Safari or Chrome if it keeps failing.", 0);
+    status.classList.remove("is-busy");
+    status.classList.add("is-error");
+    status.textContent = "Couldn’t render GIF — try again";
+  } finally {
+    rendering = false;
+    exportVideo.pause();
+    exportVideo.currentTime = CLEAN_VIDEO_START;
+    playPreview();
+  }
+}
+
 function downloadVideo(event) {
+  if (isTwitterInAppBrowser()) {
+    event.preventDefault();
+    showSwitchBrowserMessage();
+    return;
+  }
   if (rendering) {
     event.preventDefault();
     showActionMessage("Video is already rendering");
@@ -727,29 +852,52 @@ function downloadVideo(event) {
 
   // Keep the browser's native anchor action inside this tap. Mobile browsers
   // may ignore a synthetic click made after an asynchronous render.
-  status.textContent = "Download started";
-  showActionMessage("Saving video");
+  status.textContent = "Download requested";
+  showActionMessage("If the video doesn't save, open this page in Safari or Chrome.", 8000);
+  window.setTimeout(() => setDownloadMenu(false), 0);
 }
 
 function saveRenderedVideo() {
-  const url = renderedUrl || URL.createObjectURL(renderedBlob);
+  saveRenderedFile(renderedUrl, renderedFilename, downloadLabel);
+}
+
+function downloadGif(event) {
+  if (isTwitterInAppBrowser()) {
+    event.preventDefault();
+    showSwitchBrowserMessage();
+    return;
+  }
+  if (rendering) {
+    event.preventDefault();
+    showActionMessage("An export is already rendering");
+    return;
+  }
+  if (!renderedGifBlob || gifVersion !== messageVersion) {
+    event.preventDefault();
+    gifDownloadPending = true;
+    makeGif();
+    return;
+  }
+  status.textContent = "Download requested";
+  showActionMessage("If the GIF doesn't save, open this page in Safari or Chrome.", 8000);
+  window.setTimeout(() => setDownloadMenu(false), 0);
+}
+
+function saveRenderedFile(url, filename, label) {
   const link = document.createElement("a");
   link.href = url;
-  link.download = renderedFilename;
+  link.download = filename;
   link.rel = "noopener";
   document.body.append(link);
   link.click();
   link.remove();
-  if (!renderedUrl) window.setTimeout(() => URL.revokeObjectURL(url), 1000);
-  downloadLabel.textContent = "Download again";
-  downloadButton.removeAttribute("aria-busy");
-  downloadIcon.innerHTML = '<path d="m5 10 3.2 3.2L15.5 6" />';
-  showActionMessage("Download started");
+  setDownloadMenu(false);
+  label.textContent = "Saving…";
+  status.textContent = "Download requested";
+  showActionMessage("If the file doesn't save, open this page in Safari or Chrome.", 8000);
   window.clearTimeout(downloadResetTimer);
   downloadResetTimer = window.setTimeout(() => {
-    downloadLabel.textContent = "Download again";
-    downloadButton.removeAttribute("aria-busy");
-    downloadIcon.innerHTML = '<path d="M10 2v10m0 0 4-4m-4 4-4-4M3 16.5h14" />';
+    label.textContent = filename.endsWith(".gif") ? "GIF" : "Video";
   }, 1600);
 }
 
@@ -852,6 +1000,17 @@ characterStamp.addEventListener("click", () => {
   showActionMessage("Hamster character selected");
 });
 downloadButton.addEventListener("click", downloadVideo);
+gifDownloadButton.addEventListener("click", downloadGif);
+downloadToggle.addEventListener("click", () => setDownloadMenu(downloadMenu.hidden));
+document.addEventListener("pointerdown", (event) => {
+  if (!event.target.closest(".download-picker")) setDownloadMenu(false);
+});
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && !downloadMenu.hidden) {
+    setDownloadMenu(false);
+    downloadToggle.focus();
+  }
+});
 form.addEventListener("submit", (event) => event.preventDefault());
 
 const sharedText = new URLSearchParams(location.search).get("text");

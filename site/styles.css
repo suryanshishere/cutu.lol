@@ -831,6 +831,7 @@ textarea {
   letter-spacing: 0.08em;
   text-transform: uppercase;
   transition: color 150ms ease, border-color 150ms ease, background 150ms ease, transform 150ms ease;
+  cursor: pointer;
 }
 
 .download-button:hover:not(.is-disabled) {
@@ -844,6 +845,61 @@ textarea {
 
 .download-button:active:not(.is-disabled) {
   transform: translateY(1px) scale(0.98);
+}
+
+.download-picker {
+  position: relative;
+}
+
+.download-menu {
+  position: absolute;
+  z-index: 5;
+  right: 0;
+  bottom: calc(100% + 8px);
+  display: grid;
+  min-width: 170px;
+  padding: 5px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--paper);
+  box-shadow: 0 8px 22px rgb(27 25 19 / 13%);
+}
+
+.download-menu[hidden] {
+  display: none;
+}
+
+.download-option {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 11px 12px;
+  border-radius: 8px;
+  color: var(--ink);
+  font-family: "Arial Narrow", "Avenir Next Condensed", "Segoe UI", sans-serif;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-decoration: none;
+  text-transform: uppercase;
+}
+
+.download-option small {
+  color: var(--soft-ink);
+  font-size: 0.58rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.download-option:hover {
+  background: #f8f7f4;
+}
+
+.download-option:focus-visible,
+.download-button:focus-visible {
+  outline: 3px solid var(--cheese);
+  outline-offset: 2px;
 }
 
 /* Controls stay anchored; feedback comes from color/icon/label changes. */
@@ -877,6 +933,14 @@ textarea {
 .action-message.is-visible {
   opacity: 1;
   transform: translateY(0);
+}
+
+.action-message.is-guidance {
+  color: var(--ink);
+  font-size: 0.76rem;
+  letter-spacing: 0.02em;
+  line-height: 1.4;
+  text-transform: none;
 }
 
 .character-stamp {
