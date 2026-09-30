@@ -1,6 +1,6 @@
 # cutu.lol
 
-A browser based Baby Boo hamster meme maker. Add text, preview it over the looping hamster clip, then export a 1080p WebM with sound or copy a link that opens with your text. The visitor counters count each browser once per day and once overall, using a one-year visitor cookie and a Cloudflare Durable Object.
+A browser based Baby Boo hamster meme maker. Add text, preview it over the looping hamster clip, then export a 1080p MP4 with sound or copy a link that opens with your text. The visitor counters count each browser once per day and once overall, using a one-year visitor cookie and a Cloudflare Durable Object.
 
 ## Run
 
@@ -8,7 +8,7 @@ A browser based Baby Boo hamster meme maker. Add text, preview it over the loopi
 npm run dev
 ```
 
-Then open `http://127.0.0.1:4173` in Chrome, Edge, or Firefox. Video export uses the browser's `MediaRecorder` API and begins only when Download is clicked.
+Then open `http://127.0.0.1:4173` in Chrome, Edge, or Safari. Video export uses the browser's `MediaRecorder` API with MP4 support and begins only when Download is clicked. Firefox currently lacks MP4 recording support.
 
 ## Cloudflare
 

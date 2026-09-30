@@ -51,7 +51,7 @@ let exportVersion = -1;
 let recorderAudioDestination;
 let monitorGain;
 let renderedBlob;
-let renderedFilename = "hamster-type.webm";
+const renderedFilename = "hamster-type.mp4";
 let messageVersion = 0;
 let renderPending = false;
 let downloadPending = false;
@@ -438,9 +438,8 @@ function seekVideo(time, video = hamsterVideo) {
 
 function getRecorderMimeType() {
   const choices = [
-    "video/webm;codecs=vp9,opus",
-    "video/webm;codecs=vp8,opus",
-    "video/webm"
+    "video/mp4;codecs=avc1,mp4a.40.2",
+    "video/mp4"
   ];
   return choices.find((type) => MediaRecorder.isTypeSupported(type)) || "";
 }
@@ -494,9 +493,10 @@ async function makeVideo(event) {
     return;
   }
 
-  if (!window.MediaRecorder || !exportCanvas.captureStream) {
+  const mimeType = window.MediaRecorder && getRecorderMimeType();
+  if (!mimeType || !exportCanvas.captureStream) {
     status.classList.add("is-error");
-    status.textContent = "Export needs Chrome, Edge, or Firefox";
+    status.textContent = "MP4 export needs Chrome, Edge, or Safari";
     downloadPending = false;
     downloadLabel.textContent = "Download it";
     downloadButton.removeAttribute("aria-busy");
@@ -542,8 +542,7 @@ async function makeVideo(event) {
       ...canvasStream.getVideoTracks(),
       ...recorderAudioDestination.stream.getAudioTracks()
     ]);
-    const mimeType = getRecorderMimeType();
-    const recorder = new MediaRecorder(combinedStream, mimeType ? { mimeType, videoBitsPerSecond: EXPORT_VIDEO_BITRATE, audioBitsPerSecond: 64_000 } : undefined);
+    const recorder = new MediaRecorder(combinedStream, { mimeType, videoBitsPerSecond: EXPORT_VIDEO_BITRATE, audioBitsPerSecond: 64_000 });
     const chunks = [];
     let animationFrame = 0;
     let lastProgress = -1;
@@ -583,9 +582,8 @@ async function makeVideo(event) {
     canvasStream.getTracks().forEach((track) => track.stop());
     combinedStream.getVideoTracks().forEach((track) => track.stop());
 
-    const blob = new Blob(chunks, { type: recorder.mimeType || "video/webm" });
+    const blob = new Blob(chunks, { type: "video/mp4" });
     renderedBlob = blob;
-    renderedFilename = blob.type.startsWith("video/mp4") ? "hamster-type.mp4" : "hamster-type.webm";
     downloadButton.download = renderedFilename;
     exportVersion = renderVersion;
     if (renderedUrl) URL.revokeObjectURL(renderedUrl);
