@@ -1,5 +1,3 @@
-import { createFrameCleaner } from "./frame-cleaner.js";
-
 const form = document.querySelector("#text-form");
 const messageInput = document.querySelector("#message");
 const previewText = document.querySelector("#preview-text");
@@ -29,15 +27,13 @@ const analysisCanvas = document.createElement("canvas");
 analysisCanvas.width = 96;
 analysisCanvas.height = 54;
 const analysisContext = analysisCanvas.getContext("2d", { willReadFrequently: true });
-const cleanVideoFrame = createFrameCleaner();
 const todayViewers = document.querySelector("#today-viewers");
 const totalVisits = document.querySelector("#total-visits");
 const siteStats = document.querySelector(".site-stats");
 
-const OUTPUT_LONG_EDGE = 1280;
-const EXPORT_VIDEO_BITRATE = 2_000_000;
-// Keep the complete source timeline. Background cleanup removes the light
-// matte without dropping the opening frames.
+const DESKTOP_LONG_EDGE = 960;
+const MOBILE_LONG_EDGE = 720;
+// Keep the complete source timeline; the WebM already has a transparent matte.
 const CLEAN_VIDEO_START = 0;
 let renderedUrl = "";
 let rendering = false;
@@ -51,7 +47,7 @@ let exportVersion = -1;
 let recorderAudioDestination;
 let monitorGain;
 let renderedBlob;
-const renderedFilename = "hamster-type.mp4";
+let renderedFilename = "hamster-type.mp4";
 let messageVersion = 0;
 let renderPending = false;
 let downloadPending = false;
@@ -177,6 +173,7 @@ function updateLivePreview() {
     downloadButton.href = "#";
     status.textContent = "Ready to export";
   }
+  updateShareLabel();
   if (!rendering) status.textContent = "Ready to export";
 }
 
@@ -227,6 +224,7 @@ function loadVisitStats() {
 
 function updateStageRatio() {
   if (!hamsterVideo.videoWidth || !hamsterVideo.videoHeight) return;
+  stage.classList.toggle("is-opaque-source", hamsterVideo.currentSrc.endsWith("hamster-fallback.mp4"));
   stage.style.setProperty("--stage-ratio", `${hamsterVideo.videoWidth} / ${hamsterVideo.videoHeight}`);
   requestAnimationFrame(layoutPreviewText);
 }
@@ -391,6 +389,18 @@ function drawFrame(elapsedSeconds, message, canvas = exportCanvas, context = exp
 
   context.fillStyle = "#ffffff";
   context.fillRect(0, 0, width, height);
+  const activeVideo = rendering ? exportVideo : hamsterVideo;
+  const videoEnd = activeVideo.duration || 0;
+  const sourceFrame = cleanEndFrame && activeVideo.currentTime >= videoEnd - 0.04
+    ? cleanEndFrame
+    : activeVideo;
+  const opaqueSource = activeVideo.currentSrc.endsWith("hamster-fallback.mp4");
+  const drawSource = () => {
+    context.imageSmoothingEnabled = true;
+    context.imageSmoothingQuality = "high";
+    context.drawImage(sourceFrame, -width * 0.04, -height * 0.04, width * 1.08, height * 1.08);
+  };
+  if (opaqueSource) drawSource();
   context.textBaseline = "alphabetic";
   context.font = `700 ${size}px Georgia, "Times New Roman", serif`;
   context.fillStyle = "#171714";
@@ -412,17 +422,7 @@ function drawFrame(elapsedSeconds, message, canvas = exportCanvas, context = exp
 
   context.globalAlpha = 1;
   context.textAlign = "left";
-  const videoWidth = width * 1.08;
-  const videoHeight = height * 1.08;
-  context.imageSmoothingEnabled = true;
-  context.imageSmoothingQuality = "high";
-  const activeVideo = rendering ? exportVideo : hamsterVideo;
-  const videoEnd = activeVideo.duration || 0;
-  const sourceFrame = cleanEndFrame && activeVideo.currentTime >= videoEnd - 0.04
-    ? cleanEndFrame
-    : activeVideo;
-  const cleanedFrame = cleanVideoFrame(sourceFrame, width, height);
-  context.drawImage(cleanedFrame, -width * 0.04, -height * 0.04, videoWidth, videoHeight);
+  if (!opaqueSource) drawSource();
 }
 
 function seekVideo(time, video = hamsterVideo) {
@@ -436,38 +436,93 @@ function seekVideo(time, video = hamsterVideo) {
   });
 }
 
-function getRecorderMimeType() {
-  const choices = [
-    "video/mp4;codecs=avc1,mp4a.40.2",
-    "video/mp4"
-  ];
-  return choices.find((type) => MediaRecorder.isTypeSupported(type)) || "";
+function mobileSaveNeedsTap() {
+  return navigator.maxTouchPoints > 0 && window.matchMedia("(pointer: coarse)").matches;
 }
 
-function waitForCleanVideoEnd() {
-  return new Promise((resolve) => {
-    const video = exportVideo;
-    if ("requestVideoFrameCallback" in video) {
-      const checkFrame = (_now, metadata) => {
-        if (metadata.mediaTime >= video.duration - 0.03 || video.ended) {
-          resolve();
-          return;
-        }
-        video.requestVideoFrameCallback(checkFrame);
-      };
-      video.requestVideoFrameCallback(checkFrame);
-      video.addEventListener("ended", resolve, { once: true });
-      return;
-    }
+function renderedFile() {
+  return new File([renderedBlob], renderedFilename, { type: renderedBlob.type });
+}
 
-    const checkTime = () => {
-      if (video.currentTime >= video.duration - 0.03 || video.ended) {
-        video.removeEventListener("timeupdate", checkTime);
-        resolve();
+function canShareRenderedVideo() {
+  if (!mobileSaveNeedsTap() || !navigator.share || !navigator.canShare || !renderedBlob || exportVersion !== messageVersion) return false;
+  try {
+    return navigator.canShare({ files: [renderedFile()] });
+  } catch {
+    return false;
+  }
+}
+
+function updateShareLabel() {
+  const label = canShareRenderedVideo() ? "Share video" : navigator.share && mobileSaveNeedsTap() ? "Share link" : "Copy link";
+  shareButton.setAttribute("aria-label", label);
+  shareButton.title = label;
+  shareLabel.textContent = label;
+}
+
+function createRecorder(stream, videoBitsPerSecond) {
+  const choices = [
+    "video/mp4;codecs=avc1.42E01E,mp4a.40.2",
+    "video/mp4;codecs=avc1,mp4a.40.2",
+    "video/mp4",
+    "video/webm;codecs=vp8,opus",
+    "video/webm"
+  ];
+  for (const mimeType of choices) {
+    if (!MediaRecorder.isTypeSupported(mimeType)) continue;
+    try {
+      return new MediaRecorder(stream, { mimeType, videoBitsPerSecond, audioBitsPerSecond: 64_000 });
+    } catch {
+      // Some browsers report a type as supported but reject its constructor.
+    }
+  }
+  throw new Error("This browser cannot record MP4 or WebM video");
+}
+
+function waitForVideoEnd(video, duration) {
+  return new Promise((resolve, reject) => {
+    const timeout = window.setTimeout(() => finish(new Error("Video playback stalled")), Math.max(30_000, duration * 4000));
+    const onEnded = () => finish();
+    const onError = () => finish(video.error || new Error("Source video failed"));
+    function finish(error) {
+      window.clearTimeout(timeout);
+      video.removeEventListener("ended", onEnded);
+      video.removeEventListener("error", onError);
+      if (error) reject(error);
+      else resolve();
+    }
+    video.addEventListener("ended", onEnded);
+    video.addEventListener("error", onError);
+  });
+}
+
+function verifyRecording(blob, duration) {
+  if (blob.size < 30_000) return Promise.reject(new Error("Recorded video is empty"));
+  return new Promise((resolve, reject) => {
+    const probe = document.createElement("video");
+    const url = URL.createObjectURL(blob);
+    let settled = false;
+    const timeout = window.setTimeout(() => finish(new Error("Recorded video could not be opened")), 8000);
+    function finish(error) {
+      if (settled) return;
+      settled = true;
+      window.clearTimeout(timeout);
+      probe.removeAttribute("src");
+      probe.load();
+      URL.revokeObjectURL(url);
+      if (error) reject(error);
+      else resolve();
+    }
+    probe.addEventListener("loadedmetadata", () => {
+      if (Number.isFinite(probe.duration) && probe.duration < duration - 0.5) {
+        finish(new Error("Recorded video ended early"));
+      } else {
+        finish();
       }
-    };
-    video.addEventListener("timeupdate", checkTime);
-    video.addEventListener("ended", resolve, { once: true });
+    }, { once: true });
+    probe.addEventListener("error", () => finish(new Error("Recorded video is not playable")), { once: true });
+    probe.preload = "metadata";
+    probe.src = url;
   });
 }
 
@@ -481,6 +536,7 @@ function monitorCleanPlayback() {
 
 function setBusy(isBusy) {
   rendering = isBusy;
+  if (isBusy) hamsterVideo.pause();
   status.classList.toggle("is-busy", isBusy);
   status.classList.remove("is-error");
   status.textContent = isBusy ? "Loading video for export" : "Ready";
@@ -489,14 +545,13 @@ function setBusy(isBusy) {
 async function makeVideo(event) {
   event?.preventDefault();
   if (rendering) {
-    renderPending = true;
+    showActionMessage("Video is already rendering");
     return;
   }
 
-  const mimeType = window.MediaRecorder && getRecorderMimeType();
-  if (!mimeType || !exportCanvas.captureStream) {
+  if (!window.MediaRecorder || !exportCanvas.captureStream) {
     status.classList.add("is-error");
-    status.textContent = "MP4 export needs Chrome, Edge, or Safari";
+    status.textContent = "Video export is not supported in this browser";
     downloadPending = false;
     downloadLabel.textContent = "Download it";
     downloadButton.removeAttribute("aria-busy");
@@ -508,6 +563,10 @@ async function makeVideo(event) {
   downloadButton.setAttribute("aria-busy", "true");
   const renderVersion = messageVersion;
   const message = cleanMessage();
+  let canvasStream;
+  let combinedStream;
+  let recorder;
+  let animationFrame = 0;
 
   try {
     await prepareAudio();
@@ -522,7 +581,8 @@ async function makeVideo(event) {
     const sourceWidth = exportVideo.videoWidth || 1080;
     const sourceHeight = exportVideo.videoHeight || 1080;
     const duration = exportVideo.duration || 9;
-    const scale = OUTPUT_LONG_EDGE / Math.max(sourceWidth, sourceHeight);
+    const mobile = mobileSaveNeedsTap();
+    const scale = (mobile ? MOBILE_LONG_EDGE : DESKTOP_LONG_EDGE) / Math.max(sourceWidth, sourceHeight);
     exportCanvas.width = Math.max(2, Math.round(sourceWidth * scale / 2) * 2);
     exportCanvas.height = Math.max(2, Math.round(sourceHeight * scale / 2) * 2);
     exportSlide = 0;
@@ -537,37 +597,43 @@ async function makeVideo(event) {
     await seekVideo(CLEAN_VIDEO_START, exportVideo);
     setTextSide("right", false);
 
-    const canvasStream = exportCanvas.captureStream(30);
-    const combinedStream = new MediaStream([
+    canvasStream = exportCanvas.captureStream(30);
+    combinedStream = new MediaStream([
       ...canvasStream.getVideoTracks(),
       ...recorderAudioDestination.stream.getAudioTracks()
     ]);
-    const recorder = new MediaRecorder(combinedStream, { mimeType, videoBitsPerSecond: EXPORT_VIDEO_BITRATE, audioBitsPerSecond: 64_000 });
+    recorder = createRecorder(combinedStream, mobile ? 1_400_000 : 2_000_000);
+    const mimeType = recorder.mimeType || "video/webm";
     const chunks = [];
-    let animationFrame = 0;
-    let lastProgress = -1;
+    let lastProgress = -10;
 
     recorder.addEventListener("dataavailable", (chunkEvent) => {
       if (chunkEvent.data.size) chunks.push(chunkEvent.data);
     });
 
-    const completed = new Promise((resolve) => recorder.addEventListener("stop", resolve, { once: true }));
+    const completed = new Promise((resolve, reject) => {
+      recorder.addEventListener("stop", resolve, { once: true });
+      recorder.addEventListener("error", (event) => reject(event.error || new Error("Recording failed")), { once: true });
+    });
     const draw = () => {
       const elapsed = Math.max(0, exportVideo.currentTime - CLEAN_VIDEO_START);
       drawFrame(elapsed, message, exportCanvas, exportContext);
-      const progress = Math.min(99, Math.floor(elapsed / duration * 100));
+      const progress = Math.min(90, Math.floor(elapsed / duration * 10) * 10);
       if (progress !== lastProgress) {
         lastProgress = progress;
-        downloadLabel.textContent = `Rendering ${progress}%`;
         status.textContent = `Rendering video ${progress}%`;
       }
-      if (rendering && !exportVideo.ended) animationFrame = requestAnimationFrame(draw);
+      if (rendering && !exportVideo.ended) {
+        animationFrame = requestAnimationFrame(draw);
+      }
     };
 
-    recorder.start(250);
-    draw();
+    recorder.start();
+    downloadLabel.textContent = "Rendering video";
+    drawFrame(0, message, exportCanvas, exportContext);
     await exportVideo.play();
-    await waitForCleanVideoEnd();
+    draw();
+    await waitForVideoEnd(exportVideo, duration);
     downloadLabel.textContent = "Finishing…";
     status.textContent = "Finishing video";
     exportVideo.pause();
@@ -575,15 +641,14 @@ async function makeVideo(event) {
     // Paint one known-clean frame and let the canvas stream flush it before
     // stopping. This removes the final-frame flash/overlay glitch.
     drawFrame(Math.max(CLEAN_VIDEO_START, duration - 0.01), message, exportCanvas, exportContext);
-    await new Promise((resolve) => requestAnimationFrame(resolve));
+    await new Promise((resolve) => window.setTimeout(resolve, 120));
     recorder.stop();
     await completed;
 
-    canvasStream.getTracks().forEach((track) => track.stop());
-    combinedStream.getVideoTracks().forEach((track) => track.stop());
-
-    const blob = new Blob(chunks, { type: "video/mp4" });
+    const blob = new Blob(chunks, { type: mimeType });
+    await verifyRecording(blob, duration);
     renderedBlob = blob;
+    renderedFilename = mimeType.startsWith("video/mp4") ? "hamster-type.mp4" : "hamster-type.webm";
     downloadButton.download = renderedFilename;
     exportVersion = renderVersion;
     if (renderedUrl) URL.revokeObjectURL(renderedUrl);
@@ -592,16 +657,21 @@ async function makeVideo(event) {
       downloadButton.href = renderedUrl;
       downloadButton.classList.remove("is-disabled");
       downloadButton.setAttribute("aria-disabled", "false");
-      // Keep Share available on desktop too; shareVideo has a download
-      // fallback when the browser does not implement Web Share.
       shareButton.disabled = false;
-      status.textContent = "Video ready";
+      updateShareLabel();
+      status.textContent = mobile ? "Video ready. Tap Save video." : "Video ready";
       if (downloadPending) {
         downloadPending = false;
         renderPending = false;
-        saveRenderedVideo();
+        if (mobile) {
+          downloadLabel.textContent = "Save video";
+          downloadButton.removeAttribute("aria-busy");
+          showActionMessage("Ready — tap Save video");
+        } else {
+          saveRenderedVideo();
+        }
       } else {
-        downloadLabel.textContent = "Download it";
+        downloadLabel.textContent = "Save video";
         downloadButton.removeAttribute("aria-busy");
       }
     } else {
@@ -609,6 +679,7 @@ async function makeVideo(event) {
       URL.revokeObjectURL(renderedUrl);
       renderedUrl = "";
       downloadButton.href = "#";
+      updateShareLabel();
       status.textContent = "Text changed—ready to export";
       renderPending = renderPending || downloadPending;
     }
@@ -625,6 +696,10 @@ async function makeVideo(event) {
     status.textContent = "Couldn’t render—try again";
   } finally {
     rendering = false;
+    cancelAnimationFrame(animationFrame);
+    if (recorder?.state === "recording") recorder.stop();
+    canvasStream?.getTracks().forEach((track) => track.stop());
+    combinedStream?.getVideoTracks().forEach((track) => track.stop());
     exportVideo.pause();
     exportVideo.currentTime = CLEAN_VIDEO_START;
     playPreview();
@@ -636,22 +711,24 @@ async function makeVideo(event) {
 }
 
 function downloadVideo(event) {
-  event?.preventDefault();
   if (rendering) {
-    downloadPending = true;
-    downloadLabel.textContent = "Preparing...";
-    downloadButton.setAttribute("aria-busy", "true");
+    event.preventDefault();
+    showActionMessage("Video is already rendering");
     return;
   }
   if (!renderedBlob || exportVersion !== messageVersion) {
+    event.preventDefault();
     downloadPending = true;
-    downloadLabel.textContent = "Preparing...";
+    downloadLabel.textContent = "Preparing video";
     downloadButton.setAttribute("aria-busy", "true");
     makeVideo();
     return;
   }
 
-  saveRenderedVideo();
+  // Keep the browser's native anchor action inside this tap. Mobile browsers
+  // may ignore a synthetic click made after an asynchronous render.
+  status.textContent = "Download started";
+  showActionMessage("Saving video");
 }
 
 function saveRenderedVideo() {
@@ -664,13 +741,13 @@ function saveRenderedVideo() {
   link.click();
   link.remove();
   if (!renderedUrl) window.setTimeout(() => URL.revokeObjectURL(url), 1000);
-  downloadLabel.textContent = "Downloaded";
+  downloadLabel.textContent = "Download again";
   downloadButton.removeAttribute("aria-busy");
   downloadIcon.innerHTML = '<path d="m5 10 3.2 3.2L15.5 6" />';
-  showActionMessage("Video downloaded");
+  showActionMessage("Download started");
   window.clearTimeout(downloadResetTimer);
   downloadResetTimer = window.setTimeout(() => {
-    downloadLabel.textContent = "Download it";
+    downloadLabel.textContent = "Download again";
     downloadButton.removeAttribute("aria-busy");
     downloadIcon.innerHTML = '<path d="M10 2v10m0 0 4-4m-4 4-4-4M3 16.5h14" />';
   }, 1600);
@@ -683,6 +760,20 @@ async function shareVideo() {
   const linkText = shareUrl.href;
 
   try {
+    if (navigator.share && mobileSaveNeedsTap()) {
+      try {
+        const fileShare = canShareRenderedVideo();
+        await navigator.share(fileShare
+          ? { title: "Baby Boo video", files: [renderedFile()] }
+          : { title: "Baby Boo video", url: linkText });
+        status.textContent = fileShare ? "Video shared" : "Link shared";
+        showActionMessage(fileShare ? "Video shared" : "Link shared");
+        return;
+      } catch (error) {
+        if (error.name === "AbortError") return;
+        // Use the copy flow when native sharing is unavailable.
+      }
+    }
     let copied = false;
     if (navigator.clipboard?.writeText) {
       try {
@@ -710,7 +801,7 @@ async function shareVideo() {
     shareIcon.innerHTML = '<path d="m5 10 3.2 3.2L15.5 6" />';
     window.clearTimeout(shareResetTimer);
     shareResetTimer = window.setTimeout(() => {
-      shareLabel.textContent = "Copy link";
+      updateShareLabel();
       shareIcon.innerHTML = '<rect x="7" y="6" width="10" height="11" rx="1.5" /><path d="M13 6V4.5A1.5 1.5 0 0 0 11.5 3h-7A1.5 1.5 0 0 0 3 4.5v8A1.5 1.5 0 0 0 4.5 14H7" />';
     }, 1600);
   } catch (error) {
@@ -769,6 +860,7 @@ updateLivePreview();
 updateStageRatio();
 updatePlayButton();
 updateSoundButton();
+updateShareLabel();
 startPreviewWithSound();
 monitorCleanPlayback();
 loadVisitStats();

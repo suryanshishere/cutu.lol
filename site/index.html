@@ -101,11 +101,13 @@
             <video
               id="hamster-video"
               class="hamster-video"
-              src="hamster-preview.webm"
               loop
               playsinline
               preload="auto"
-            ></video>
+            >
+              <source src="hamster-preview.webm" type="video/webm; codecs=&quot;vp9, opus&quot;" />
+              <source src="hamster-fallback.mp4" type="video/mp4" />
+            </video>
             <div class="stage-controls" aria-label="Preview controls">
               <button id="play-button" class="stage-control" type="button" aria-label="Pause video" title="Pause video">
                 <svg id="play-icon" class="button-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M6.5 4.5v11m7-11v11" /></svg>
@@ -149,7 +151,10 @@
     </main>
 
     <canvas id="export-canvas" hidden></canvas>
-    <video id="export-video" src="hamster-export.webm" muted playsinline preload="none" hidden></video>
+    <video id="export-video" muted playsinline preload="none" hidden>
+      <source src="hamster-export.webm" type="video/webm; codecs=&quot;vp9, opus&quot;" />
+      <source src="hamster-fallback.mp4" type="video/mp4" />
+    </video>
     <script type="module" src="app.js"></script>
   </body>
 </html>

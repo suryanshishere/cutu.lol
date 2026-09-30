@@ -9,6 +9,7 @@ const contentTypes = {
   ".css": "text/css; charset=utf-8",
   ".js": "text/javascript; charset=utf-8",
   ".webm": "video/webm",
+  ".mp4": "video/mp4",
   ".svg": "image/svg+xml",
   ".png": "image/png",
   ".txt": "text/plain; charset=utf-8",
@@ -36,7 +37,7 @@ createServer((request, response) => {
   const type = contentTypes[extname(filePath).toLowerCase()] || "application/octet-stream";
   const range = request.headers.range;
 
-  if (range && type === "video/webm") {
+  if (range && (type === "video/webm" || type === "video/mp4")) {
     const match = /^bytes=(\d+)-(\d*)$/.exec(range);
     const start = match ? Number(match[1]) : NaN;
     const end = match && match[2] ? Number(match[2]) : stat.size - 1;
@@ -58,7 +59,7 @@ createServer((request, response) => {
   response.writeHead(200, {
     "Content-Type": type,
     "Content-Length": stat.size,
-    "Cache-Control": type === "video/webm" ? "public, max-age=3600" : "no-cache"
+    "Cache-Control": type.startsWith("video/") ? "public, max-age=3600" : "no-cache"
   });
   createReadStream(filePath).pipe(response);
 }).listen(port, "127.0.0.1", () => {
