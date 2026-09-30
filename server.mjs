@@ -1,9 +1,13 @@
-import { createReadStream, existsSync, statSync } from "node:fs";
+import { createReadStream, existsSync, readFileSync, statSync } from "node:fs";
 import { createServer } from "node:http";
 import { extname, resolve, sep } from "node:path";
+import { Resvg } from "@cf-wasm/resvg/node";
+import { applyShareMeta, renderShareCard, shareText } from "./src/share-card.js";
 
 const port = Number(process.env.PORT || 4173);
 const root = resolve("site");
+const shareStamp = readFileSync(resolve(root, "share-stamp.png"));
+const shareFont = readFileSync(resolve(root, "share-lora.woff2"));
 const contentTypes = {
   ".html": "text/html; charset=utf-8",
   ".css": "text/css; charset=utf-8",
@@ -16,12 +20,29 @@ const contentTypes = {
   ".xml": "application/xml; charset=utf-8"
 };
 
-createServer((request, response) => {
+createServer(async (request, response) => {
   let pathname;
+  let url;
   try {
-    pathname = decodeURIComponent(new URL(request.url, "http://localhost").pathname);
+    url = new URL(request.url, `http://${request.headers.host || "localhost"}`);
+    pathname = decodeURIComponent(url.pathname);
   } catch {
     response.writeHead(400).end("Bad request");
+    return;
+  }
+  if ((request.method === "GET" || request.method === "HEAD") && pathname === "/share-card.png") {
+    if (request.method === "HEAD") {
+      response.writeHead(200, { "Content-Type": "image/png", "Cache-Control": "public, max-age=86400", "X-Content-Type-Options": "nosniff" }).end();
+      return;
+    }
+    try {
+      const png = await renderShareCard(shareText(url.searchParams.get("text")), shareStamp, shareFont, Resvg);
+      response.writeHead(200, { "Content-Type": "image/png", "Content-Length": png.length, "Cache-Control": "public, max-age=86400", "X-Content-Type-Options": "nosniff" });
+      response.end(png);
+    } catch (error) {
+      console.error("Share card render failed", error);
+      response.writeHead(500).end("Share card render failed");
+    }
     return;
   }
   const relativePath = pathname === "/" ? "index.html" : pathname.replace(/^\/+/, "");
@@ -35,6 +56,12 @@ createServer((request, response) => {
 
   const stat = statSync(filePath);
   const type = contentTypes[extname(filePath).toLowerCase()] || "application/octet-stream";
+  if (type.startsWith("text/html")) {
+    const html = applyShareMeta(readFileSync(filePath, "utf8"), url);
+    response.writeHead(200, { "Content-Type": type, "Content-Length": Buffer.byteLength(html), "Cache-Control": "no-cache" });
+    response.end(html);
+    return;
+  }
   const range = request.headers.range;
 
   if (range && (type === "video/webm" || type === "video/mp4")) {

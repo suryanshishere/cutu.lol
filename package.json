@@ -9,9 +9,12 @@
     "dev:cloudflare": "npm run prepare:public && wrangler dev",
     "deploy": "npm run check && npm run prepare:public && wrangler deploy",
     "start": "node server.mjs",
-    "check": "node --check site/app.js && node --check server.mjs && node --check src/worker.js && node --check scripts/prepare-public.mjs"
+    "check": "node --check site/app.js && node --check server.mjs && node --check src/worker.js && node --check src/share-card.js && node --check scripts/prepare-public.mjs"
   },
   "devDependencies": {
     "wrangler": "^4.136.1"
+  },
+  "dependencies": {
+    "@cf-wasm/resvg": "^0.4.0"
   }
 }

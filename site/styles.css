@@ -75,7 +75,7 @@ label,
   font-size: 0.71rem;
   font-weight: 800;
   letter-spacing: 0.12em;
-  text-transform: uppercase;
+  text-transform: capitalize;
 }
 
 .site-stats {
@@ -88,7 +88,7 @@ label,
   font-size: 0.6rem;
   font-weight: 800;
   letter-spacing: 0.09em;
-  text-transform: uppercase;
+  text-transform: capitalize;
 }
 
 .visitor-stat {
@@ -202,7 +202,7 @@ textarea {
   resize: none;
   padding: 18px 20px 20px;
   border: 2px solid var(--ink);
-  border-radius: 3px 8px 4px 7px;
+  border-radius: 16px;
   outline: none;
   background: var(--paper);
   color: var(--ink);
@@ -554,7 +554,7 @@ textarea {
   font-weight: 800;
   letter-spacing: 0.13em;
   text-align: center;
-  text-transform: uppercase;
+  text-transform: capitalize;
   backdrop-filter: blur(4px);
 }
 
@@ -732,8 +732,8 @@ textarea {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: auto;
-  min-width: 82px;
+  width: 112px;
+  min-width: 112px;
   height: 40px;
   gap: 7px;
   padding: 0 13px;
@@ -745,8 +745,18 @@ textarea {
   font-size: 0.65rem;
   font-weight: 800;
   letter-spacing: 0.08em;
-  text-transform: uppercase;
+  text-transform: capitalize;
   transition: color 150ms ease, border-color 150ms ease, background 150ms ease, transform 150ms ease;
+}
+
+.share-button.icon-button {
+  overflow: hidden;
+  transition: width 240ms ease, color 150ms ease, border-color 150ms ease, background 150ms ease, transform 150ms ease;
+}
+
+#share-label {
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .sound-button.icon-button:hover,
@@ -815,11 +825,14 @@ textarea {
 
 /* Download uses the same quiet pill language as the utility buttons. */
 .download-button {
+  position: relative;
+  width: 100%;
   min-width: 82px;
   height: 40px;
   min-height: 40px;
-  gap: 7px;
-  padding: 0 13px;
+  gap: 8px;
+  overflow: hidden;
+  padding: 0 10px;
   border: 1px solid var(--line);
   border-radius: 999px;
   background: var(--paper);
@@ -829,7 +842,7 @@ textarea {
   font-size: 0.65rem;
   font-weight: 800;
   letter-spacing: 0.08em;
-  text-transform: uppercase;
+  text-transform: capitalize;
   transition: color 150ms ease, border-color 150ms ease, background 150ms ease, transform 150ms ease;
   cursor: pointer;
 }
@@ -847,8 +860,62 @@ textarea {
   transform: translateY(1px) scale(0.98);
 }
 
+.download-button {
+  white-space: nowrap;
+}
+
+.download-button #download-toggle-label {
+  display: inline-block;
+  font-variant-numeric: tabular-nums;
+}
+
+.download-button .download-chevron {
+  opacity: 1;
+  transition: opacity 180ms ease, transform 180ms ease;
+}
+
+.download-button.has-download-state {
+  gap: 0;
+}
+
+.download-button.has-download-state .download-chevron {
+  width: 0;
+  flex-basis: 0;
+  opacity: 0;
+  transform: translateY(-3px);
+}
+
+.download-progress-outline {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  fill: none;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 180ms ease;
+}
+
+.download-progress-outline rect {
+  stroke: var(--cheese-deep);
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-dasharray: var(--download-progress-dash, 0) 100;
+  transition: stroke-dasharray 380ms ease;
+}
+
+.download-button[aria-busy="true"] .download-progress-outline {
+  opacity: 1;
+}
+
+.download-button[aria-busy="true"] {
+  cursor: progress;
+}
+
 .download-picker {
   position: relative;
+  flex: 0 0 116px;
+  width: 116px;
 }
 
 .download-menu {
@@ -857,7 +924,7 @@ textarea {
   right: 0;
   bottom: calc(100% + 8px);
   display: grid;
-  min-width: 170px;
+  min-width: 150px;
   padding: 5px;
   border: 1px solid var(--line);
   border-radius: 12px;
@@ -882,7 +949,7 @@ textarea {
   font-weight: 800;
   letter-spacing: 0.06em;
   text-decoration: none;
-  text-transform: uppercase;
+  text-transform: capitalize;
 }
 
 .download-option small {
@@ -916,31 +983,42 @@ textarea {
 }
 
 .action-message {
-  min-height: 1.1rem;
-  margin: 11px 0 0;
-  color: var(--soft-ink);
+  position: fixed;
+  z-index: 1000;
+  left: 50%;
+  bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+  width: max-content;
+  max-width: min(440px, calc(100vw - 32px));
+  margin: 0;
+  padding: 13px 20px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--paper);
+  box-shadow: 0 14px 38px rgb(27 25 19 / 18%), 0 3px 10px rgb(27 25 19 / 8%);
+  color: var(--ink);
   font-family: "Arial Narrow", "Avenir Next Condensed", "Segoe UI", sans-serif;
-  font-size: 0.62rem;
+  font-size: 0.72rem;
   font-weight: 800;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.06em;
+  line-height: 1.4;
   text-align: center;
-  text-transform: uppercase;
+  text-transform: capitalize;
   opacity: 0;
-  transform: translateY(-3px);
-  transition: opacity 150ms ease, transform 150ms ease;
+  pointer-events: none;
+  transform: translate(-50%, 28px) scale(0.96);
+  transition: opacity 240ms ease, transform 300ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
 .action-message.is-visible {
   opacity: 1;
-  transform: translateY(0);
+  transform: translate(-50%, 0) scale(1);
 }
 
 .action-message.is-guidance {
-  color: var(--ink);
   font-size: 0.76rem;
   letter-spacing: 0.02em;
   line-height: 1.4;
-  text-transform: none;
+  text-transform: capitalize;
 }
 
 .character-stamp {
@@ -1235,25 +1313,9 @@ textarea {
 }
 
 .stage-controls {
-  position: absolute;
-  z-index: 4;
-  top: 14px;
-  right: 14px;
   display: flex;
   gap: 8px;
-  opacity: 0;
-  transform: translateY(-4px);
-  transition: opacity 150ms ease, transform 150ms ease;
-  pointer-events: none;
-}
-
-.stage:hover .stage-controls,
-.stage:focus-within .stage-controls,
-.stage.needs-sound .stage-controls,
-.stage.is-paused .stage-controls {
-  opacity: 1;
-  transform: none;
-  pointer-events: auto;
+  margin-right: 8px;
 }
 
 .stage-control {
@@ -1275,7 +1337,7 @@ textarea {
   border-color: var(--ink);
 }
 
-.stage.needs-sound #sound-button {
+.stage.needs-sound + .preview-tools #sound-button {
   border-color: var(--ink);
   background: var(--cheese);
 }
@@ -1294,6 +1356,7 @@ textarea {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-wrap: wrap;
 }
 
 .site-footer {
@@ -1348,26 +1411,17 @@ textarea {
   height: 17px;
 }
 
-@media (hover: none) {
-  .stage-controls {
-    opacity: 1;
-    transform: none;
-    pointer-events: auto;
-  }
-}
-
 @media (max-width: 480px) {
-  .stage-controls {
-    top: 8px;
-    right: 8px;
-  }
-
   .preview-tools {
     gap: 8px;
   }
 
   .output-actions {
     gap: 6px;
+  }
+
+  .stage-controls {
+    margin-right: 6px;
   }
 
   .site-footer {
@@ -1389,5 +1443,18 @@ textarea {
 
   .stat-divider {
     display: block;
+  }
+}
+
+@media (max-width: 350px) {
+  .share-button.icon-button {
+    width: 40px;
+    min-width: 40px;
+    padding: 0;
+    gap: 0;
+  }
+
+  #share-label {
+    display: none;
   }
 }

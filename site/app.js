@@ -7,6 +7,7 @@ const exportVideo = document.querySelector("#export-video");
 const textMeasure = document.querySelector("#text-measure");
 const status = document.querySelector("#status");
 const downloadToggle = document.querySelector("#download-toggle");
+const downloadToggleLabel = document.querySelector("#download-toggle-label");
 const downloadMenu = document.querySelector("#download-menu");
 const downloadButton = document.querySelector("#download-button");
 const downloadLabel = document.querySelector("#download-label");
@@ -43,7 +44,7 @@ const CLEAN_VIDEO_START = 0;
 let renderedUrl = "";
 let renderedGifUrl = "";
 let rendering = false;
-let soundEnabled = true;
+let soundEnabled = false;
 let soundUnlocked = false;
 let textSide = "right";
 let audioContext;
@@ -63,20 +64,70 @@ let gifDownloadPending = false;
 let exportSlide = 0;
 let cleanEndFrame;
 let downloadResetTimer;
+let downloadState = "menu";
+let downloadLabelAnimation;
 let shareResetTimer;
 let actionMessageTimer;
 let editingText = false;
 let manuallyPaused = false;
 
 function setDownloadMenu(open) {
+  if (downloadState !== "menu") open = false;
   downloadMenu.hidden = !open;
   downloadToggle.setAttribute("aria-expanded", String(open));
 }
 
+function setDownloadState(state, label, url = "", filename = "") {
+  window.clearTimeout(downloadResetTimer);
+  downloadState = state;
+  setDownloadMenu(false);
+  if (downloadToggleLabel.textContent !== label) {
+    downloadToggleLabel.textContent = label;
+    downloadLabelAnimation?.cancel();
+    if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      downloadLabelAnimation = downloadToggleLabel.animate([
+        { opacity: 0.35, transform: "translateY(3px)" },
+        { opacity: 1, transform: "translateY(0)" }
+      ], { duration: 220, easing: "ease-out" });
+    }
+  }
+  downloadToggle.classList.toggle("has-download-state", state !== "menu");
+  downloadToggle.setAttribute("aria-busy", String(state === "busy"));
+  if (state === "busy") {
+    const percent = Number(label.match(/(\d+)%/)?.[1] || (label.startsWith("Finishing") ? 96 : 2));
+    downloadToggle.style.setProperty("--download-progress-dash", String(Math.max(2, percent)));
+  } else if (state === "menu") {
+    downloadToggle.style.setProperty("--download-progress-dash", "0");
+  }
+  downloadToggle.href = state === "ready" ? url : "#";
+  if (state === "ready") downloadToggle.download = filename;
+  else downloadToggle.removeAttribute("download");
+}
+
+function resetDownloadState() {
+  setDownloadState("menu", "Download");
+}
+
+function showDownloadProgress(label) {
+  setDownloadState("busy", label);
+}
+
+function showDownloadReady(label, url, filename) {
+  setDownloadState("ready", label, url, filename);
+  downloadResetTimer = window.setTimeout(resetDownloadState, 7000);
+}
+
+function showDownloadSaving(label, url, filename) {
+  setDownloadState("saving", "Saving…");
+  downloadResetTimer = window.setTimeout(() => showDownloadReady(label, url, filename), 1200);
+}
+
 function showActionMessage(message, duration = 1800) {
+  actionMessage.classList.remove("is-visible");
   actionMessage.textContent = message;
-  actionMessage.classList.add("is-visible");
   actionMessage.classList.toggle("is-guidance", duration !== 1800);
+  void actionMessage.offsetWidth;
+  actionMessage.classList.add("is-visible");
   window.clearTimeout(actionMessageTimer);
   if (duration) {
     actionMessageTimer = window.setTimeout(() => {
@@ -206,6 +257,7 @@ function updateLivePreview() {
   }
   downloadLabel.textContent = "Video";
   gifDownloadLabel.textContent = "GIF";
+  if (!rendering) resetDownloadState();
   actionMessage.classList.remove("is-visible");
   updateShareLabel();
   if (!rendering) status.textContent = "Ready to export";
@@ -218,8 +270,8 @@ function playPreview() {
 function updatePlayButton() {
   const paused = hamsterVideo.paused;
   stage.classList.toggle("is-paused", paused);
-  playButton.setAttribute("aria-label", paused ? "Play video" : "Pause video");
-  playButton.title = paused ? "Play video" : "Pause video";
+  playButton.setAttribute("aria-label", paused ? "Play Video" : "Pause Video");
+  playButton.title = paused ? "Play Video" : "Pause Video";
   playIcon.innerHTML = paused
     ? '<path d="m7 4.5 8 5.5-8 5.5z" />'
     : '<path d="M6.5 4.5v11m7-11v11" />';
@@ -290,13 +342,13 @@ async function prepareAudio() {
 function updateSoundButton() {
   const audible = soundEnabled && soundUnlocked;
   soundButton.setAttribute("aria-pressed", String(audible));
-  soundLabel.textContent = audible ? "Sound on" : soundEnabled ? "Tap for sound" : "Sound off";
+  soundLabel.textContent = audible ? "Sound On" : soundEnabled ? "Tap for Sound" : "Sound Off";
   soundIcon.classList.toggle("is-on", audible);
   soundIcon.innerHTML = audible
     ? '<path d="M3 8h3l4-3v10l-4-3H3zM13 7.2a4 4 0 0 1 0 5.6M15.4 5a7 7 0 0 1 0 10" />'
     : '<path d="M3 8h3l4-3v10l-4-3H3zM14 7l3 3m0 0-3 3" />';
-  soundButton.setAttribute("aria-label", audible ? "Turn sound off" : "Turn sound on");
-  soundButton.title = audible ? "Turn sound off" : soundEnabled ? "Tap for sound" : "Turn sound on";
+  soundButton.setAttribute("aria-label", audible ? "Turn Sound Off" : "Turn Sound On");
+  soundButton.title = audible ? "Turn Sound Off" : soundEnabled ? "Tap for Sound" : "Turn Sound On";
   stage.classList.toggle("needs-sound", soundEnabled && !soundUnlocked);
 }
 
@@ -319,18 +371,9 @@ async function toggleSound() {
   }
 }
 
-async function startPreviewWithSound() {
-  hamsterVideo.muted = false;
-  try {
-    await hamsterVideo.play();
-    soundUnlocked = true;
-  } catch {
-    if (!soundUnlocked) {
-      hamsterVideo.muted = true;
-      await hamsterVideo.play().catch(() => {});
-    }
-  }
-  updateSoundButton();
+async function startPreviewMuted() {
+  hamsterVideo.muted = true;
+  await hamsterVideo.play().catch(() => {});
 }
 
 function wrapText(context, text, maxWidth) {
@@ -366,12 +409,12 @@ function wrapText(context, text, maxWidth) {
   return lines;
 }
 
-function layoutText(context, text, width, height, topInset = 0) {
-  const key = `${width}:${height}:${topInset}:${text}`;
+function layoutText(context, text, width, height) {
+  const key = `${width}:${height}:${text}`;
   if (textLayoutCache.has(key)) return textLayoutCache.get(key);
 
   const maxWidth = width * 0.52;
-  const maxHeight = Math.min(height * 0.78, height - topInset - 8);
+  const maxHeight = Math.min(height * 0.78, height - 8);
   const initialSize = Math.min(width * 0.103, height * 0.16);
   let low = 0.5;
   let high = initialSize;
@@ -404,13 +447,12 @@ function layoutText(context, text, width, height, topInset = 0) {
 
 function layoutPreviewText() {
   if (!stage.clientWidth || !stage.clientHeight) return;
-  const topInset = window.innerWidth <= 820 || window.matchMedia("(hover: none)").matches ? 52 : 0;
-  const layout = layoutText(previewMeasureContext, cleanMessage(), stage.clientWidth, stage.clientHeight, topInset);
+  const layout = layoutText(previewMeasureContext, cleanMessage(), stage.clientWidth, stage.clientHeight);
   previewText.textContent = layout.lines.join("\n");
   previewText.style.fontSize = `${layout.size}px`;
   previewText.style.lineHeight = `${layout.lineHeight}px`;
   previewText.style.width = `${Math.ceil(layout.width + 1)}px`;
-  previewText.style.top = `${(stage.clientHeight + topInset) / 2}px`;
+  previewText.style.top = `${stage.clientHeight / 2}px`;
   positionPreviewText(false);
 }
 
@@ -488,9 +530,14 @@ function canShareRenderedVideo() {
 }
 
 function updateShareLabel() {
-  const label = canShareRenderedVideo() ? "Share video" : navigator.share && mobileSaveNeedsTap() ? "Share link" : "Copy link";
+  const label = canShareRenderedVideo() ? "Share Video" : navigator.share && mobileSaveNeedsTap() ? "Share Link" : "Copy Link";
   shareButton.setAttribute("aria-label", label);
   shareButton.title = label;
+  setShareLabel(label);
+}
+
+function setShareLabel(label) {
+  if (shareLabel.textContent === label) return;
   shareLabel.textContent = label;
 }
 
@@ -614,17 +661,19 @@ async function makeVideo(event) {
 
   if (!window.MediaRecorder || !exportCanvas.captureStream) {
     status.classList.add("is-error");
-    status.textContent = "Video export is not supported in this browser. Open this page in Safari or Chrome.";
-    showActionMessage("Open this page in Safari or Chrome to download your video.", 0);
+    status.textContent = "Video export is not supported in this browser.";
+    showActionMessage("Video export is not supported in this browser.", 0);
     downloadPending = false;
     downloadLabel.textContent = "Video";
     downloadButton.removeAttribute("aria-busy");
+    resetDownloadState();
     return;
   }
 
   setBusy(true);
   downloadLabel.textContent = "Preparing video…";
   downloadButton.setAttribute("aria-busy", "true");
+  showDownloadProgress("Preparing…");
   const renderVersion = messageVersion;
   const message = cleanMessage();
   let canvasStream;
@@ -662,6 +711,7 @@ async function makeVideo(event) {
       if (progress !== lastProgress) {
         lastProgress = progress;
         status.textContent = `Rendering video ${progress}%`;
+        showDownloadProgress(`Video ${progress}%`);
       }
       if (rendering && !exportVideo.ended) {
         animationFrame = requestAnimationFrame(draw);
@@ -676,6 +726,7 @@ async function makeVideo(event) {
     await waitForVideoEnd(exportVideo, duration);
     downloadLabel.textContent = "Finishing…";
     status.textContent = "Finishing video";
+    showDownloadProgress("Finishing…");
     exportVideo.pause();
     cancelAnimationFrame(animationFrame);
     // Paint one known-clean frame and let the canvas stream flush it before
@@ -706,6 +757,7 @@ async function makeVideo(event) {
         if (mobile) {
           downloadLabel.textContent = "Save video";
           downloadButton.removeAttribute("aria-busy");
+          showDownloadReady("Save video", renderedUrl, renderedFilename);
           showActionMessage("Ready — tap Save video");
         } else {
           saveRenderedVideo();
@@ -713,6 +765,7 @@ async function makeVideo(event) {
       } else {
         downloadLabel.textContent = "Save video";
         downloadButton.removeAttribute("aria-busy");
+        showDownloadReady("Save video", renderedUrl, renderedFilename);
       }
     } else {
       renderedBlob = undefined;
@@ -730,7 +783,8 @@ async function makeVideo(event) {
     renderPending = false;
     downloadLabel.textContent = "Video";
     downloadButton.removeAttribute("aria-busy");
-    showActionMessage("Video export failed. Open this page in Safari or Chrome if it keeps failing.", 0);
+    resetDownloadState();
+    showActionMessage("Video export failed. Try again.", 0);
     status.classList.remove("is-busy");
     status.classList.add("is-error");
     status.textContent = "Couldn’t render—try again";
@@ -759,6 +813,7 @@ async function makeGif() {
   setBusy(true);
   gifDownloadLabel.textContent = "Preparing GIF…";
   gifDownloadButton.setAttribute("aria-busy", "true");
+  showDownloadProgress("Preparing…");
   const renderVersion = messageVersion;
   const message = cleanMessage();
 
@@ -784,10 +839,12 @@ async function makeGif() {
         const progress = Math.round(frame / frameCount * 100);
         status.textContent = `Rendering GIF ${progress}%`;
         gifDownloadLabel.textContent = `GIF ${progress}%`;
+        showDownloadProgress(`GIF ${progress}%`);
         await new Promise((resolve) => window.setTimeout(resolve, 0));
       }
     }
 
+    showDownloadProgress("Finishing…");
     gif.finish();
     const bytes = gif.bytes();
     if (bytes.length < 100) throw new Error("GIF export is empty");
@@ -803,14 +860,19 @@ async function makeGif() {
       gifDownloadButton.removeAttribute("aria-busy");
       if (gifDownloadPending) {
         gifDownloadPending = false;
-        if (mobileSaveNeedsTap()) showActionMessage("Ready — tap Save GIF");
-        else saveRenderedFile(renderedGifUrl, "hamster-type.gif", gifDownloadLabel);
+        if (mobileSaveNeedsTap()) {
+          showDownloadReady("Save GIF", renderedGifUrl, "hamster-type.gif");
+          showActionMessage("Ready — tap Save GIF");
+        } else saveRenderedFile(renderedGifUrl, "hamster-type.gif");
+      } else {
+        showDownloadReady("Save GIF", renderedGifUrl, "hamster-type.gif");
       }
     } else {
       gifDownloadPending = false;
       gifDownloadLabel.textContent = "GIF";
       gifDownloadButton.removeAttribute("aria-busy");
       status.textContent = "Text changed — ready to export";
+      resetDownloadState();
     }
     status.classList.remove("is-busy");
   } catch (error) {
@@ -818,7 +880,8 @@ async function makeGif() {
     gifDownloadPending = false;
     gifDownloadLabel.textContent = "GIF";
     gifDownloadButton.removeAttribute("aria-busy");
-    showActionMessage("GIF export failed. Open this page in Safari or Chrome if it keeps failing.", 0);
+    resetDownloadState();
+    showActionMessage("GIF export failed. Try again.", 0);
     status.classList.remove("is-busy");
     status.classList.add("is-error");
     status.textContent = "Couldn’t render GIF — try again";
@@ -846,6 +909,7 @@ function downloadVideo(event) {
     downloadPending = true;
     downloadLabel.textContent = "Preparing video";
     downloadButton.setAttribute("aria-busy", "true");
+    showDownloadProgress("Preparing…");
     makeVideo();
     return;
   }
@@ -853,12 +917,12 @@ function downloadVideo(event) {
   // Keep the browser's native anchor action inside this tap. Mobile browsers
   // may ignore a synthetic click made after an asynchronous render.
   status.textContent = "Download requested";
-  showActionMessage("If the video doesn't save, open this page in Safari or Chrome.", 8000);
-  window.setTimeout(() => setDownloadMenu(false), 0);
+  showActionMessage("Download requested. Check your browser's downloads.");
+  window.setTimeout(() => showDownloadSaving("Save video", renderedUrl, renderedFilename), 0);
 }
 
 function saveRenderedVideo() {
-  saveRenderedFile(renderedUrl, renderedFilename, downloadLabel);
+  saveRenderedFile(renderedUrl, renderedFilename);
 }
 
 function downloadGif(event) {
@@ -879,11 +943,11 @@ function downloadGif(event) {
     return;
   }
   status.textContent = "Download requested";
-  showActionMessage("If the GIF doesn't save, open this page in Safari or Chrome.", 8000);
-  window.setTimeout(() => setDownloadMenu(false), 0);
+  showActionMessage("Download requested. Check your browser's downloads.");
+  window.setTimeout(() => showDownloadSaving("Save GIF", renderedGifUrl, "hamster-type.gif"), 0);
 }
 
-function saveRenderedFile(url, filename, label) {
+function saveRenderedFile(url, filename) {
   const link = document.createElement("a");
   link.href = url;
   link.download = filename;
@@ -891,19 +955,14 @@ function saveRenderedFile(url, filename, label) {
   document.body.append(link);
   link.click();
   link.remove();
-  setDownloadMenu(false);
-  label.textContent = "Saving…";
+  showDownloadSaving(filename.endsWith(".gif") ? "Save GIF" : "Save video", url, filename);
   status.textContent = "Download requested";
-  showActionMessage("If the file doesn't save, open this page in Safari or Chrome.", 8000);
-  window.clearTimeout(downloadResetTimer);
-  downloadResetTimer = window.setTimeout(() => {
-    label.textContent = filename.endsWith(".gif") ? "GIF" : "Video";
-  }, 1600);
+  showActionMessage("Download requested. Check your browser's downloads.");
 }
 
 async function shareVideo() {
-  const shareUrl = new URL(location.href);
-  shareUrl.searchParams.set("text", messageInput.value.trim());
+  const shareUrl = new URL("/", location.origin);
+  shareUrl.searchParams.set("text", messageInput.value.trim().slice(0, 120));
   shareUrl.searchParams.delete("name");
   const linkText = shareUrl.href;
 
@@ -945,7 +1004,7 @@ async function shareVideo() {
     if (!copied) throw new Error("Clipboard copy was denied");
     status.textContent = "Link copied";
     showActionMessage("Link copied");
-    shareLabel.textContent = "Copied";
+    setShareLabel("Copied");
     shareIcon.innerHTML = '<path d="m5 10 3.2 3.2L15.5 6" />';
     window.clearTimeout(shareResetTimer);
     shareResetTimer = window.setTimeout(() => {
@@ -974,8 +1033,8 @@ hamsterVideo.addEventListener("pause", updatePlayButton);
 hamsterVideo.addEventListener("timeupdate", syncTextToCharacter);
 hamsterVideo.addEventListener("seeked", syncTextToCharacter);
 window.addEventListener("resize", layoutPreviewText);
-// A browser may block audible autoplay. Keep sound requested by default and
-// unlock it on the first gesture; the speaker button handles its own gesture.
+// If audible playback is requested, unlock it on the next gesture.
+// The speaker button handles its own gesture.
 const unlockAudio = (event) => {
   if (event.target.closest?.("#sound-button") || !soundEnabled || soundUnlocked) return;
   prepareAudio().then(playPreview).catch(console.error);
@@ -1001,7 +1060,24 @@ characterStamp.addEventListener("click", () => {
 });
 downloadButton.addEventListener("click", downloadVideo);
 gifDownloadButton.addEventListener("click", downloadGif);
-downloadToggle.addEventListener("click", () => setDownloadMenu(downloadMenu.hidden));
+downloadToggle.addEventListener("click", (event) => {
+  if (downloadState === "ready") {
+    const label = downloadToggleLabel.textContent;
+    const url = downloadToggle.href;
+    const filename = downloadToggle.download;
+    status.textContent = "Download requested";
+    window.setTimeout(() => showDownloadSaving(label, url, filename), 0);
+    return;
+  }
+  event.preventDefault();
+  if (downloadState === "menu") setDownloadMenu(downloadMenu.hidden);
+});
+downloadToggle.addEventListener("keydown", (event) => {
+  if (event.key === " ") {
+    event.preventDefault();
+    downloadToggle.click();
+  }
+});
 document.addEventListener("pointerdown", (event) => {
   if (!event.target.closest(".download-picker")) setDownloadMenu(false);
 });
@@ -1014,12 +1090,12 @@ document.addEventListener("keydown", (event) => {
 form.addEventListener("submit", (event) => event.preventDefault());
 
 const sharedText = new URLSearchParams(location.search).get("text");
-if (sharedText) messageInput.value = sharedText.slice(0, 240);
+if (sharedText) messageInput.value = sharedText.slice(0, 120);
 updateLivePreview();
 updateStageRatio();
 updatePlayButton();
 updateSoundButton();
 updateShareLabel();
-startPreviewWithSound();
+startPreviewMuted();
 monitorCleanPlayback();
 loadVisitStats();
