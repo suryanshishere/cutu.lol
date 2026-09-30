@@ -52,8 +52,8 @@ function lineWidth(line) {
   }, 0);
 }
 
-function wrapMessage(message, size) {
-  const maxUnits = 535 / size;
+function wrapMessage(message, size, maxWidth = 1000) {
+  const maxUnits = maxWidth / size;
   const lines = [];
   let line = "";
   for (const word of message.split(" ")) {
@@ -77,11 +77,19 @@ function wrapMessage(message, size) {
 }
 
 function layoutMessage(message) {
+  if (wrapMessage(message, 58).length > 1) {
+    for (const size of [52, 48, 44, 40, 36, 32]) {
+      const segments = wrapMessage(message, size, 350);
+      const rows = Math.ceil(segments.length / 2);
+      if (rows * size * 1.18 <= 300) return { lines: segments, size, aroundStamp: true };
+    }
+    return { lines: wrapMessage(message, 32, 350), size: 32, aroundStamp: true };
+  }
   for (const size of [58, 54, 50, 46, 42, 38, 34]) {
     const lines = wrapMessage(message, size);
-    if (lines.length * size * 1.18 <= 325) return { lines, size };
+    if (lines.length * size * 1.18 <= 205) return { lines, size, aroundStamp: false };
   }
-  return { lines: wrapMessage(message, 34).slice(0, 8), size: 34 };
+  return { lines: wrapMessage(message, 34), size: 34, aroundStamp: false };
 }
 
 function base64(bytes) {
@@ -94,23 +102,23 @@ function base64(bytes) {
 
 export function shareCardSvg(value, stampBytes) {
   const message = shareText(value) || DEFAULT_TEXT;
-  const { lines, size } = layoutMessage(message);
+  const { lines, size, aroundStamp } = layoutMessage(message);
   const lineHeight = size * 1.18;
-  const firstBaseline = 320 - ((lines.length - 1) * lineHeight) / 2;
-  const messageLines = lines.map((line, index) => `<text x="530" y="${Math.round(firstBaseline + index * lineHeight)}" font-family="Lora" font-size="${size}" font-weight="700" fill="#24202d">${escapeMarkup(line)}</text>`).join("");
+  const stampHeight = 350;
+  const stampY = (630 - stampHeight) / 2;
+  const rows = aroundStamp ? Math.ceil(lines.length / 2) : lines.length;
+  const firstBaseline = 315 + size * 0.3 - ((rows - 1) * lineHeight) / 2;
+  const messageLines = lines.map((line, index) => {
+    const row = aroundStamp ? Math.floor(index / 2) : index;
+    const x = aroundStamp ? (index % 2 === 0 ? 440 : 760) : 600;
+    const anchor = aroundStamp ? (index % 2 === 0 ? "end" : "start") : "middle";
+    return `<text x="${x}" y="${Math.round(firstBaseline + row * lineHeight)}" text-anchor="${anchor}" font-family="Lora" font-size="${size}" font-weight="700" fill="#24202d">${escapeMarkup(line)}</text>`;
+  }).join("");
   return `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="1200" height="630" viewBox="0 0 1200 630">
     <rect width="1200" height="630" fill="#fbf8f0"/>
     <rect x="22" y="22" width="1156" height="586" rx="22" fill="none" stroke="#25212b" stroke-width="3"/>
-    <rect x="42" y="42" width="432" height="546" rx="13" fill="#f5d779"/>
-    <circle cx="452" cy="94" r="34" fill="#e4b73e" opacity=".45"/>
-    <circle cx="73" cy="538" r="50" fill="#e4b73e" opacity=".45"/>
-    <image x="58" y="50" width="400" height="500" xlink:href="data:image/png;base64,${base64(stampBytes)}"/>
-    <text x="530" y="112" font-family="Lora" font-size="22" font-weight="700" letter-spacing="3" fill="#746c61">A NOTE FROM BABY BOO</text>
-    <path d="M530 138h608" stroke="#d8cbb5" stroke-width="2"/>
     ${messageLines}
-    <path d="M530 518h608" stroke="#d8cbb5" stroke-width="2"/>
-    <circle cx="543" cy="553" r="7" fill="#e0af2e"/>
-    <text x="562" y="561" font-family="Lora" font-size="23" font-weight="700" fill="#25212b">made with cutu.lol</text>
+    <image x="460" y="${Math.round(stampY)}" width="280" height="${stampHeight}" transform="rotate(-7 600 ${Math.round(stampY + stampHeight / 2)})" xlink:href="data:image/png;base64,${base64(stampBytes)}"/>
   </svg>`;
 }
 
