@@ -42,6 +42,7 @@ const CLEAN_VIDEO_START = 0;
 let renderedUrl = "";
 let rendering = false;
 let soundEnabled = true;
+let soundUnlocked = false;
 let textSide = "right";
 let audioContext;
 let previewMediaSource;
@@ -241,28 +242,63 @@ async function prepareAudio() {
     exportMediaSource.connect(recorderAudioDestination);
     previewMediaSource.connect(monitorGain);
     monitorGain.connect(audioContext.destination);
-    hamsterVideo.muted = false;
-    exportVideo.muted = false;
   }
 
+  hamsterVideo.muted = false;
+  exportVideo.muted = false;
+  if (!editingText && !manuallyPaused && !rendering) hamsterVideo.play().catch(() => {});
   if (audioContext.state === "suspended") {
     await audioContext.resume();
   }
+  if (audioContext.state !== "running") throw new Error("Audio is waiting for a browser gesture");
+  soundUnlocked = true;
+  updateSoundButton();
+}
+
+function updateSoundButton() {
+  const audible = soundEnabled && soundUnlocked;
+  soundButton.setAttribute("aria-pressed", String(audible));
+  soundLabel.textContent = audible ? "Sound on" : soundEnabled ? "Tap for sound" : "Sound off";
+  soundIcon.classList.toggle("is-on", audible);
+  soundIcon.innerHTML = audible
+    ? '<path d="M3 8h3l4-3v10l-4-3H3zM13 7.2a4 4 0 0 1 0 5.6M15.4 5a7 7 0 0 1 0 10" />'
+    : '<path d="M3 8h3l4-3v10l-4-3H3zM14 7l3 3m0 0-3 3" />';
+  soundButton.setAttribute("aria-label", audible ? "Turn sound off" : "Turn sound on");
+  soundButton.title = audible ? "Turn sound off" : soundEnabled ? "Tap for sound" : "Turn sound on";
+  stage.classList.toggle("needs-sound", soundEnabled && !soundUnlocked);
 }
 
 async function toggleSound() {
-  await prepareAudio();
-  soundEnabled = !soundEnabled;
-  monitorGain.gain.setTargetAtTime(soundEnabled ? 0.82 : 0, audioContext.currentTime, 0.018);
-  soundButton.setAttribute("aria-pressed", String(soundEnabled));
-  soundLabel.textContent = soundEnabled ? "Sound on" : "Sound off";
-  soundIcon.classList.toggle("is-on", soundEnabled);
-  soundIcon.innerHTML = soundEnabled
-    ? '<path d="M3 8h3l4-3v10l-4-3H3zM13 7.2a4 4 0 0 1 0 5.6M15.4 5a7 7 0 0 1 0 10" />'
-    : '<path d="M3 8h3l4-3v10l-4-3H3zM14 7l3 3m0 0-3 3" />';
-  showActionMessage(soundEnabled ? "Sound on" : "Sound off");
-  soundButton.setAttribute("aria-label", soundEnabled ? "Turn sound off" : "Turn sound on");
-  soundButton.title = soundEnabled ? "Turn sound off" : "Turn sound on";
+  try {
+    if (soundEnabled && !soundUnlocked) {
+      await prepareAudio();
+      playPreview();
+    } else {
+      soundEnabled = !soundEnabled;
+      if (soundEnabled) await prepareAudio();
+      if (monitorGain) monitorGain.gain.setTargetAtTime(soundEnabled ? 0.82 : 0, audioContext.currentTime, 0.018);
+      hamsterVideo.muted = !soundEnabled;
+    }
+    updateSoundButton();
+    showActionMessage(soundEnabled ? "Sound on" : "Sound off");
+  } catch (error) {
+    console.error(error);
+    showActionMessage("Tap again for sound");
+  }
+}
+
+async function startPreviewWithSound() {
+  hamsterVideo.muted = false;
+  try {
+    await hamsterVideo.play();
+    soundUnlocked = true;
+  } catch {
+    if (!soundUnlocked) {
+      hamsterVideo.muted = true;
+      await hamsterVideo.play().catch(() => {});
+    }
+  }
+  updateSoundButton();
 }
 
 function wrapText(context, text, maxWidth) {
@@ -387,6 +423,17 @@ function drawFrame(elapsedSeconds, message, canvas = exportCanvas, context = exp
     : activeVideo;
   const cleanedFrame = cleanVideoFrame(sourceFrame, width, height);
   context.drawImage(cleanedFrame, -width * 0.04, -height * 0.04, videoWidth, videoHeight);
+}
+
+function seekVideo(time, video = hamsterVideo) {
+  return new Promise((resolve) => {
+    if (Math.abs(video.currentTime - time) < 0.001) {
+      resolve();
+      return;
+    }
+    video.addEventListener("seeked", resolve, { once: true });
+    video.currentTime = time;
+  });
 }
 
 function getRecorderMimeType() {
@@ -690,13 +737,22 @@ hamsterVideo.addEventListener("pause", updatePlayButton);
 hamsterVideo.addEventListener("timeupdate", syncTextToCharacter);
 hamsterVideo.addEventListener("seeked", syncTextToCharacter);
 window.addEventListener("resize", layoutPreviewText);
-// Browsers only allow audible autoplay after a user gesture. Keep sound enabled
-// as the default preference and unlock the audio graph on the first gesture.
-const unlockAudio = () => prepareAudio().catch(console.error);
-document.addEventListener("pointerdown", unlockAudio, { once: true, capture: true });
-document.addEventListener("keydown", unlockAudio, { once: true, capture: true });
-soundButton.addEventListener("click", toggleSound);
-playButton.addEventListener("click", togglePlayback);
+// A browser may block audible autoplay. Keep sound requested by default and
+// unlock it on the first gesture; the speaker button handles its own gesture.
+const unlockAudio = (event) => {
+  if (event.target.closest?.("#sound-button") || !soundEnabled || soundUnlocked) return;
+  prepareAudio().then(playPreview).catch(console.error);
+};
+document.addEventListener("pointerdown", unlockAudio, { capture: true });
+document.addEventListener("keydown", unlockAudio, { capture: true });
+soundButton.addEventListener("click", (event) => {
+  event.stopPropagation();
+  toggleSound();
+});
+playButton.addEventListener("click", (event) => {
+  event.stopPropagation();
+  togglePlayback();
+});
 stage.addEventListener("click", (event) => {
   if (!event.target.closest(".stage-controls")) togglePlayback();
 });
@@ -714,5 +770,7 @@ if (sharedText) messageInput.value = sharedText.slice(0, 240);
 updateLivePreview();
 updateStageRatio();
 updatePlayButton();
+updateSoundButton();
+startPreviewWithSound();
 monitorCleanPlayback();
 loadVisitStats();

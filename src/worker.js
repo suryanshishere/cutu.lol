@@ -1,4 +1,11 @@
 const SITE_COUNTER_NAME = "hamster-sitewide";
+const VISITOR_COOKIE = "cutu_visitor";
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function visitorIdFromCookie(header) {
+  const value = header?.split(";").map((part) => part.trim()).find((part) => part.startsWith(`${VISITOR_COOKIE}=`))?.slice(VISITOR_COOKIE.length + 1);
+  return value && UUID_PATTERN.test(value) ? value : null;
+}
 
 function indiaDateKey(date = new Date()) {
   const parts = new Intl.DateTimeFormat("en-GB", {
@@ -24,7 +31,7 @@ export class VisitCounter {
     }
 
     if (request.method === "POST") {
-      return Response.json(await this.recordVisit(), {
+      return Response.json(await this.recordVisit(await request.text()), {
         headers: { "Cache-Control": "no-store" }
       });
     }
@@ -32,14 +39,25 @@ export class VisitCounter {
     return new Response("Method not allowed", { status: 405 });
   }
 
-  async recordVisit() {
+  async recordVisit(visitorId) {
+    if (!UUID_PATTERN.test(visitorId)) throw new Error("Invalid visitor ID");
     const day = indiaDateKey();
+    const visitorKey = `visitor:${visitorId}`;
+    let counts;
     await this.state.storage.transaction(async (storage) => {
+      const lastVisitDay = await storage.get(visitorKey);
       const total = (await storage.get("total")) || 0;
       const today = (await storage.get(`day:${day}`)) || 0;
-      await storage.put({ total: total + 1, [`day:${day}`]: today + 1 });
+      counts = {
+        total: total + (lastVisitDay === undefined ? 1 : 0),
+        today: today + (lastVisitDay === day ? 0 : 1),
+        updatedAt: new Date().toISOString()
+      };
+      if (lastVisitDay !== day) {
+        await storage.put({ [visitorKey]: day, total: counts.total, [`day:${day}`]: counts.today });
+      }
     });
-    return this.readCounts();
+    return counts;
   }
 
   async readCounts() {
@@ -51,7 +69,6 @@ export class VisitCounter {
       updatedAt: new Date().toISOString()
     };
   }
-
 }
 
 export default {
@@ -60,16 +77,17 @@ export default {
 
     const isPageLoad = request.method === "GET" && (url.pathname === "/" || url.pathname === "/index.html");
     if (isPageLoad) {
-      const id = env.VISIT_COUNTER.idFromName(SITE_COUNTER_NAME);
-      const counter = env.VISIT_COUNTER.get(id);
-      const [assetResponse, countResponse] = await Promise.all([
-        env.ASSETS.fetch(request),
-        counter.fetch("https://visit-counter/", { method: "POST" })
-      ]);
-      const counts = await countResponse.json();
+      const assetResponse = await env.ASSETS.fetch(request);
       if (!assetResponse.ok || !assetResponse.headers.get("content-type")?.includes("text/html")) {
         return assetResponse;
       }
+
+      const existingVisitorId = visitorIdFromCookie(request.headers.get("Cookie"));
+      const visitorId = existingVisitorId || crypto.randomUUID();
+      const id = env.VISIT_COUNTER.idFromName(SITE_COUNTER_NAME);
+      const counter = env.VISIT_COUNTER.get(id);
+      const countResponse = await counter.fetch("https://visit-counter/", { method: "POST", body: visitorId });
+      const counts = await countResponse.json();
 
       const html = await assetResponse.text();
       const stats = `<script>window.__VISIT_STATS__=${JSON.stringify(counts)};</script>`;
@@ -77,6 +95,9 @@ export default {
       headers.delete("content-length");
       headers.delete("etag");
       headers.set("Cache-Control", "no-store");
+      if (!existingVisitorId) {
+        headers.append("Set-Cookie", `${VISITOR_COOKIE}=${visitorId}; Path=/; Max-Age=31536000; SameSite=Lax; HttpOnly${url.protocol === "https:" ? "; Secure" : ""}`);
+      }
       return new Response(html.replace("</head>", `${stats}</head>`), {
         status: assetResponse.status,
         statusText: assetResponse.statusText,
