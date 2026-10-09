@@ -22,9 +22,19 @@ Video export uses the browser's `MediaRecorder` API. It prefers MP4 and falls ba
 
 `POST /api/email-intake` accepts JSON `{ "email": "you@example.com" }` and returns `{ "ok": true }` only after persistence. Addresses are trimmed, normalized to lowercase, and stored once with their creation timestamp. Invalid addresses or malformed JSON return 400; oversized requests return 413; unsupported content types return 415; unsupported methods return 405; cross-origin submissions return 403. Storage failures return 503 and can be retried. Responses contain no stored addresses and are not cached.
 
-Production stores emails privately in the `EmailIntake` Durable Object, separately from visitor counters, using the `EMAIL_INTAKE` binding and the `v2` migration. There is no public listing endpoint or outgoing email integration. The local Node server stores intake in ignored `.local-data/emails.json`; Cloudflare development uses Wrangler's local Durable Object storage. Do not commit these data files. The email form is masked for Clarity; email values are not added to analytics events, logs, or URLs.
+Production stores emails privately in the `EmailIntake` Durable Object, separately from visitor counters, using the `EMAIL_INTAKE` binding and the `v2` migration. Email listing requires an authenticated admin session. There is no outgoing email integration. The local Node server stores intake in ignored `.local-data/emails.json`; Cloudflare development uses Wrangler's local Durable Object storage. Do not commit these data files. The email form is masked for Clarity; email values are not added to analytics events, logs, or URLs.
 
 Run `npm run check` for JavaScript syntax checks and the intake/storage tests. Test browser behavior manually with both formats, including keyboard navigation, closing/reopening during export, and mobile's final save tap.
+
+### Admin
+
+Open `/admin` to sign in and view collected emails with collection dates, search across emails, and see visitor totals and Video/GIF download-request counts. The admin page has no analytics scripts and is marked noindex. Download counts begin with this update and measure export requests made through **Continue to download**, rather than confirmed file saves. Duplicate request IDs are counted once within 24 hours. Existing email records and visitor counters remain available.
+
+Set `ADMIN_EMAIL` and `ADMIN_PASSWORD_HASH` as Cloudflare Worker secrets. Generate the salted password hash with the exported `hashAdminPassword` helper in `src/admin.js`; keep the password itself out of configuration files and Git. Upload the two secrets using `wrangler secret bulk` with an ignored JSON file. Copy `.env.example` to ignored `.env` for the local Node server, or use ignored `.dev.vars` for Wrangler development. No credentials have a source-code fallback.
+
+Admin APIs live under `/api/admin/`: `POST login`, `GET session`, `GET dashboard?offset=0`, and `POST logout`. Login/logout require same-origin JSON requests. Login attempts are limited to eight per IP per 15 minutes. Sessions expire after eight hours, use HttpOnly/SameSite=Strict cookies (Secure over HTTPS), and are revoked on logout or credential changes. Protected responses are never cached. Dashboard pages contain at most 100 records; the admin UI loads all pages for local search. The private Durable Object stores sessions separately from email records and cleans expired authentication records and download request IDs daily once event tracking begins.
+
+Local Node development uses in-memory sessions and download counters, and shows visitor counts as unavailable. Use Wrangler development to test persistent counters and Durable Object behavior. `POST /api/download-event` records a format and random request ID; it receives no email or password.
 
 ## Cloudflare
 

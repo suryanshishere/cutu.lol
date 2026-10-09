@@ -203,6 +203,10 @@ async function submitDownloadEmail(event) {
 
 function startSelectedDownload() {
   const format = emailForm.elements.format.value;
+  fetch("/api/download-event", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ format, id: crypto.randomUUID() }), keepalive: true
+  }).catch(() => {});
   if (format === "gif") gifDownloadButton.click();
   else downloadButton.click();
 }

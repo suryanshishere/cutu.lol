@@ -1,3 +1,5 @@
+import { createAdminStore, dashboardPage, handleAdminRequest, adminResponse, readAdminBody } from "./admin.js";
+
 const MAX_BODY_BYTES = 1024;
 
 export function normalizeEmail(value) {
@@ -60,16 +62,68 @@ export async function handleEmailIntake(request, saveEmail) {
 }
 
 export class EmailIntake {
-  constructor(state) {
+  constructor(state, env = {}) {
     this.state = state;
+    this.env = env;
+    this.adminStore = createAdminStore(state.storage);
   }
 
   async fetch(request) {
+    const url = new URL(request.url);
+    if (url.pathname.startsWith("/api/admin/")) {
+      return handleAdminRequest(request, this.env, this.adminStore, async (offset) => {
+        const emails = [];
+        let startAfter;
+        while (true) {
+          const page = await this.state.storage.list({ prefix: "email:", limit: 1000, ...(startAfter ? { startAfter } : {}) });
+          emails.push(...page.values());
+          if (page.size < 1000) break;
+          startAfter = [...page.keys()].at(-1);
+        }
+        const counter = this.env.VISIT_COUNTER.get(this.env.VISIT_COUNTER.idFromName("hamster-sitewide"));
+        const counts = await counter.fetch("https://visit-counter/");
+        if (!counts.ok) throw new Error("Counts unavailable");
+        const downloads = (await this.state.storage.get("stats:downloads")) || { video: 0, gif: 0 };
+        return { ...dashboardPage(emails, await counts.json(), offset), downloads };
+      });
+    }
+    if (url.pathname === "/api/download-event") {
+      if (request.method !== "POST") return adminResponse({ error: "Method not allowed." }, 405, { Allow: "POST" });
+      if (request.headers.get("Origin") !== url.origin) return adminResponse({ error: "Invalid origin." }, 403);
+      const parsed = await readAdminBody(request);
+      if (parsed.error) return parsed.error;
+      const { format, id } = parsed.value;
+      if (!["video", "gif"].includes(format) || typeof id !== "string" || !/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i.test(id)) return adminResponse({ error: "Invalid download event." }, 400);
+      await this.state.storage.transaction(async (storage) => {
+        const key = `download:${id}`;
+        if (await storage.get(key)) return;
+        const counts = (await storage.get("stats:downloads")) || { video: 0, gif: 0 };
+        counts[format] += 1;
+        await storage.put({ "stats:downloads": counts, [key]: Date.now() });
+      });
+      if (!await this.state.storage.getAlarm()) await this.state.storage.setAlarm(Date.now() + 24 * 60 * 60 * 1000);
+      return adminResponse({ ok: true });
+    }
     return handleEmailIntake(request, (email) => this.state.storage.transaction(async (storage) => {
       const key = `email:${email}`;
       if (await storage.get(key) === undefined) {
         await storage.put(key, { email, createdAt: new Date().toISOString() });
       }
     }));
+  }
+
+  async alarm() {
+    const cutoff = Date.now() - 24 * 60 * 60 * 1000;
+    for (const prefix of ["download:", "admin:session:", "admin:attempt:"]) {
+      let startAfter;
+      while (true) {
+        const page = await this.state.storage.list({ prefix, limit: 1000, ...(startAfter ? { startAfter } : {}) });
+        const expired = [...page].filter(([, value]) => typeof value === "number" ? value <= cutoff : value.expiresAt <= Date.now()).map(([key]) => key);
+        if (expired.length) await this.state.storage.delete(expired);
+        if (page.size < 1000) break;
+        startAfter = [...page.keys()].at(-1);
+      }
+    }
+    await this.state.storage.setAlarm(Date.now() + 24 * 60 * 60 * 1000);
   }
 }

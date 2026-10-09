@@ -1,6 +1,7 @@
 import { Resvg } from "@cf-wasm/resvg/workerd";
 import { applyShareMeta, renderShareCard, shareText } from "./share-card.js";
 import { handleEmailIntake } from "./email-intake.js";
+import { adminPageHeaders, adminResponse, readAdminBody } from "./admin.js";
 export { EmailIntake } from "./email-intake.js";
 
 const SITE_COUNTER_NAME = "hamster-sitewide";
@@ -79,6 +80,33 @@ export class VisitCounter {
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
+
+    if (["/admin", "/admin/", "/admin.html"].includes(url.pathname)) {
+      if (!["GET", "HEAD"].includes(request.method)) return new Response("Method not allowed", { status: 405 });
+      const asset = await env.ASSETS.fetch(new URL("/admin.html", url));
+      const headers = new Headers(asset.headers);
+      for (const [name, value] of Object.entries(adminPageHeaders())) headers.set(name, value);
+      return new Response(request.method === "HEAD" ? null : asset.body, { status: asset.status, headers });
+    }
+
+    if (url.pathname.startsWith("/api/admin/") || url.pathname === "/api/download-event") {
+      try {
+        let body;
+        if (request.method === "POST") {
+          if (request.headers.get("Origin") !== url.origin) return adminResponse({ error: "Invalid origin." }, 403);
+          const parsed = await readAdminBody(request);
+          if (parsed.error) return parsed.error;
+          body = JSON.stringify(parsed.value);
+        }
+        const headers = new Headers();
+        for (const name of ["Cookie", "Origin", "CF-Connecting-IP", "Content-Type"]) {
+          const value = request.headers.get(name);
+          if (value) headers.set(name, value);
+        }
+        const intake = env.EMAIL_INTAKE.get(env.EMAIL_INTAKE.idFromName("download-emails"));
+        return await intake.fetch(new Request(url, { method: request.method, headers, ...(body ? { body } : {}) }));
+      } catch { return adminResponse({ error: "Temporarily unavailable. Try again." }, 503); }
+    }
 
     if (url.pathname === "/api/email-intake") {
       return handleEmailIntake(request, async (email) => {

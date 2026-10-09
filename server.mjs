@@ -5,10 +5,23 @@ import { Resvg } from "@cf-wasm/resvg/node";
 import { applyShareMeta, renderShareCard, shareText } from "./src/share-card.js";
 import { handleEmailIntake } from "./src/email-intake.js";
 import { createLocalEmailStore } from "./src/local-email-store.js";
+import { readFile } from "node:fs/promises";
+import { adminPageHeaders, adminResponse, createMemoryAdminStore, dashboardPage, handleAdminRequest, readAdminBody } from "./src/admin.js";
+
+try { process.loadEnvFile(); } catch (error) { if (error.code !== "ENOENT") throw error; }
 
 const port = Number(process.env.PORT || 4173);
 const root = resolve("site");
 const saveEmail = createLocalEmailStore(resolve(".local-data", "emails.json"));
+const adminStore = createMemoryAdminStore();
+const localDownloads = { video: 0, gif: 0 };
+const localDownloadEvents = new Map();
+async function readLocalDashboard(offset) {
+  let emails;
+  try { emails = JSON.parse(await readFile(resolve(".local-data", "emails.json"), "utf8")); }
+  catch (error) { if (error.code !== "ENOENT") throw error; emails = []; }
+  return { ...dashboardPage(emails, { today: null, total: null }, offset), downloads: localDownloads };
+}
 const shareStamp = readFileSync(resolve(root, "share-stamp.png"));
 const shareFont = readFileSync(resolve(root, "share-lora.woff2"));
 const contentTypes = {
@@ -31,6 +44,39 @@ createServer(async (request, response) => {
     pathname = decodeURIComponent(url.pathname);
   } catch {
     response.writeHead(400).end("Bad request");
+    return;
+  }
+  if (pathname.startsWith("/api/admin/") || pathname === "/api/download-event") {
+    try {
+      const headers = new Headers(request.headers);
+      headers.delete("CF-Connecting-IP");
+      const apiRequest = new Request(url, {
+        method: request.method, headers,
+        ...(!["GET", "HEAD"].includes(request.method) ? { body: request, duplex: "half" } : {})
+      });
+      let result;
+      if (pathname.startsWith("/api/admin/")) result = await handleAdminRequest(apiRequest, process.env, adminStore, readLocalDashboard);
+      else if (request.method !== "POST") result = adminResponse({ error: "Method not allowed." }, 405);
+      else if (headers.get("Origin") !== url.origin) result = adminResponse({ error: "Invalid origin." }, 403);
+      else {
+        const parsed = await readAdminBody(apiRequest);
+        if (parsed.error) result = parsed.error;
+        else {
+          const { format, id } = parsed.value;
+          if (!["video", "gif"].includes(format) || typeof id !== "string" || !/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i.test(id)) result = adminResponse({ error: "Invalid download event." }, 400);
+          else {
+            for (const [key, time] of localDownloadEvents) if (time < Date.now() - 86400000) localDownloadEvents.delete(key);
+            if (!localDownloadEvents.has(id)) { localDownloads[format] += 1; localDownloadEvents.set(id, Date.now()); }
+            result = adminResponse({ ok: true });
+          }
+        }
+      }
+      response.writeHead(result.status, Object.fromEntries(result.headers));
+      response.end(await result.text());
+    } catch {
+      response.writeHead(503, { "Content-Type": "application/json", "Cache-Control": "no-store" });
+      response.end(JSON.stringify({ error: "Temporarily unavailable. Try again." }));
+    }
     return;
   }
   if (pathname === "/api/email-intake") {
@@ -64,7 +110,9 @@ createServer(async (request, response) => {
     }
     return;
   }
-  const relativePath = pathname === "/" ? "index.html" : pathname.replace(/^\/+/, "");
+  const isAdminPage = ["/admin", "/admin/", "/admin.html"].includes(pathname);
+  if (isAdminPage && !["GET", "HEAD"].includes(request.method)) { response.writeHead(405).end("Method not allowed"); return; }
+  const relativePath = isAdminPage ? "admin.html" : pathname === "/" ? "index.html" : pathname.replace(/^\/+/, "");
   const filePath = resolve(root, relativePath);
 
   if ((!filePath.startsWith(root + sep) && filePath !== root) || !existsSync(filePath) || !statSync(filePath).isFile()) {
@@ -76,9 +124,10 @@ createServer(async (request, response) => {
   const stat = statSync(filePath);
   const type = contentTypes[extname(filePath).toLowerCase()] || "application/octet-stream";
   if (type.startsWith("text/html")) {
-    const html = applyShareMeta(readFileSync(filePath, "utf8"), url);
-    response.writeHead(200, { "Content-Type": type, "Content-Length": Buffer.byteLength(html), "Cache-Control": "no-cache" });
-    response.end(html);
+    const source = readFileSync(filePath, "utf8");
+    const html = isAdminPage ? source : applyShareMeta(source, url);
+    response.writeHead(200, { "Content-Type": type, "Content-Length": Buffer.byteLength(html), "Cache-Control": "no-cache", ...(isAdminPage ? adminPageHeaders() : {}) });
+    response.end(request.method === "HEAD" ? undefined : html);
     return;
   }
   const range = request.headers.range;

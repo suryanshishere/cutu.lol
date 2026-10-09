@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>cutu admin</title>
+    <link rel="icon" href="/baby-boo-stamp.png" />
+    <link rel="stylesheet" href="/admin.css" />
+    <script src="/admin.js" type="module"></script>
+  </head>
+  <body>
+    <main class="admin-shell">
+      <header class="admin-header">
+        <a href="/" class="brand"><img src="/baby-boo-stamp.png" alt="" /><span>cutu <small>admin</small></span></a>
+        <button id="logout" class="quiet-button" type="button" hidden>Sign out</button>
+      </header>
+      <section id="login-panel" class="login-panel" aria-labelledby="login-title">
+        <h1 id="login-title">Welcome back.</h1>
+        <form id="login-form">
+          <label for="admin-email">Email</label>
+          <input id="admin-email" type="email" name="email" autocomplete="username" required />
+          <label for="admin-password">Password</label>
+          <input id="admin-password" type="password" name="password" autocomplete="current-password" required />
+          <p id="login-error" class="error" role="alert" hidden></p>
+          <button id="sign-in" class="primary-button" type="submit">Sign in</button>
+        </form>
+      </section>
+      <section id="dashboard" aria-labelledby="dashboard-title" hidden>
+        <div class="dashboard-heading"><h1 id="dashboard-title">Site overview</h1><button id="refresh" class="quiet-button" type="button">Refresh</button></div>
+        <p id="dashboard-status" class="status" role="status" aria-live="polite"></p>
+        <div class="metrics">
+          <article><span>Collected emails</span><strong id="email-total">—</strong></article>
+          <article><span>Visitors today</span><strong id="visitors-today">—</strong></article>
+          <article><span>Visitors all time</span><strong id="visitors-total">—</strong></article>
+          <article><span>Download requests</span><strong id="downloads-total">—</strong><small id="download-formats">Video — · GIF —</small></article>
+        </div>
+        <section class="email-section" aria-labelledby="emails-title">
+          <div class="email-heading"><h2 id="emails-title">Emails</h2><label class="search-label"><span class="sr-only">Search emails</span><input id="email-search" type="search" placeholder="Search emails" autocomplete="off" /></label></div>
+          <div class="table-wrap"><table role="table" aria-label="Collected emails"><thead><tr><th scope="col">Email address</th><th scope="col">Collected</th></tr></thead><tbody id="email-rows"></tbody></table></div>
+          <p id="empty-state" class="empty-state" hidden>No emails collected yet.</p>
+          <p id="email-count" class="status"></p>
+        </section>
+        <p class="footnote">Download counts begin with the admin update. Dates and today’s visitors use India time.</p>
+      </section>
+    </main>
+  </body>
+</html>
