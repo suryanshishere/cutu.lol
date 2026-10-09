@@ -864,111 +864,6 @@ textarea {
   white-space: nowrap;
 }
 
-.download-button #download-toggle-label {
-  display: inline-block;
-  font-variant-numeric: tabular-nums;
-}
-
-.download-button .download-chevron {
-  opacity: 1;
-  transition: opacity 180ms ease, transform 180ms ease;
-}
-
-.download-button.has-download-state {
-  gap: 0;
-}
-
-.download-button.has-download-state .download-chevron {
-  width: 0;
-  flex-basis: 0;
-  opacity: 0;
-  transform: translateY(-3px);
-}
-
-.download-progress-outline {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  fill: none;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 180ms ease;
-}
-
-.download-progress-outline rect {
-  stroke: var(--cheese-deep);
-  stroke-width: 3;
-  stroke-linecap: round;
-  stroke-dasharray: var(--download-progress-dash, 0) 100;
-  transition: stroke-dasharray 380ms ease;
-}
-
-.download-button[aria-busy="true"] .download-progress-outline {
-  opacity: 1;
-}
-
-.download-button[aria-busy="true"] {
-  cursor: progress;
-}
-
-.download-picker {
-  position: relative;
-  flex: 0 0 116px;
-  width: 116px;
-}
-
-.download-menu {
-  position: absolute;
-  z-index: 5;
-  right: 0;
-  bottom: calc(100% + 8px);
-  display: grid;
-  min-width: 150px;
-  padding: 5px;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  background: var(--paper);
-  box-shadow: 0 8px 22px rgb(27 25 19 / 13%);
-}
-
-.download-menu[hidden] {
-  display: none;
-}
-
-.download-option {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 11px 12px;
-  border-radius: 8px;
-  color: var(--ink);
-  font-family: "Arial Narrow", "Avenir Next Condensed", "Segoe UI", sans-serif;
-  font-size: 0.7rem;
-  font-weight: 800;
-  letter-spacing: 0.06em;
-  text-decoration: none;
-  text-transform: capitalize;
-}
-
-.download-option small {
-  color: var(--soft-ink);
-  font-size: 0.58rem;
-  font-weight: 600;
-  white-space: nowrap;
-}
-
-.download-option:hover {
-  background: #f8f7f4;
-}
-
-.download-option:focus-visible,
-.download-button:focus-visible {
-  outline: 3px solid var(--cheese);
-  outline-offset: 2px;
-}
-
 /* Controls stay anchored; feedback comes from color/icon/label changes. */
 .sound-button.icon-button:hover,
 .share-button.icon-button:hover:not(:disabled),
@@ -1413,15 +1308,52 @@ textarea {
 
 @media (max-width: 480px) {
   .preview-tools {
-    gap: 8px;
+    display: grid;
+    grid-template-columns: 44px minmax(0, 1fr);
+    gap: 12px;
+    align-items: center;
+  }
+
+  .preview-tools .character-stamp {
+    width: 44px;
+    height: 56px;
+    min-width: 44px;
+    align-self: center;
+  }
+
+  .preview-tools .character-stamp img {
+    width: 38px;
+    height: 48px;
   }
 
   .output-actions {
-    gap: 6px;
+    display: grid;
+    grid-template-columns: 44px 44px minmax(0, 1fr);
+    gap: 8px;
+    min-width: 0;
   }
 
   .stage-controls {
-    margin-right: 6px;
+    display: contents;
+  }
+
+  .output-actions .stage-control {
+    width: 44px;
+    height: 44px;
+  }
+
+  .output-actions .share-button.icon-button {
+    width: 100%;
+    min-width: 0;
+    height: 44px;
+    padding: 0 8px;
+    gap: 6px;
+  }
+
+  .output-actions .download-button {
+    grid-column: 1 / -1;
+    width: 100%;
+    min-height: 44px;
   }
 
   .site-footer {
@@ -1446,15 +1378,203 @@ textarea {
   }
 }
 
-@media (max-width: 350px) {
-  .share-button.icon-button {
-    width: 40px;
-    min-width: 40px;
-    padding: 0;
-    gap: 0;
-  }
+/* Compact download picker, using the composer's outlined type language. */
+.download-button {
+  flex: 0 0 116px;
+  width: 116px;
+  min-height: 44px;
+}
 
-  #share-label {
-    display: none;
+.download-dialog-open { overflow: hidden; }
+
+.download-dialog {
+  position: fixed;
+  inset: var(--dialog-viewport-top, 0px) 0 max(0px, calc(100dvh - var(--dialog-viewport-height, 100dvh) - var(--dialog-viewport-top, 0px)));
+  width: min(360px, calc(100% - 32px));
+  max-width: none;
+  max-height: calc(var(--dialog-viewport-height, 100dvh) - 32px);
+  margin: auto;
+  padding: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  border: 2px solid var(--ink);
+  border-radius: 20px;
+  outline: none;
+  background: var(--paper);
+  color: var(--ink);
+  box-shadow: 0 20px 60px rgb(23 23 20 / 16%);
+}
+
+.download-dialog::backdrop {
+  background: rgb(23 23 20 / 35%);
+  backdrop-filter: blur(3px);
+}
+
+.download-dialog[open] {
+  animation: download-dialog-enter 300ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  transform-origin: center;
+}
+.download-dialog[open]::backdrop {
+  animation: download-backdrop-enter 240ms ease-out both;
+}
+.download-dialog [hidden] { display: none !important; }
+.download-dialog-content { position: relative; padding: 20px; }
+
+.download-close {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--soft-ink);
+  cursor: pointer;
+}
+.download-close:hover { color: var(--ink); background: var(--stage); }
+.download-close svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+}
+.download-stamp {
+  display: block;
+  width: 64px;
+  height: 64px;
+  object-fit: contain;
+  margin: 0 auto 16px;
+}
+.download-email-form, .download-result { display: grid; gap: 12px; }
+.download-formats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.download-format { position: relative; }
+.download-format input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+.download-format span {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 46px;
+  padding: 10px;
+  border: 2px solid var(--line);
+  border-radius: 12px;
+  background: var(--paper);
+  color: var(--soft-ink);
+  font-family: "Arial Narrow", "Avenir Next Condensed", "Segoe UI", sans-serif;
+  font-size: 0.8rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+}
+.download-format input:checked + span { border-color: var(--ink); background: var(--cheese); color: var(--ink); }
+.download-format input:focus-visible + span { outline: 3px solid var(--cheese-deep); outline-offset: 3px; }
+.download-format input:disabled + span { opacity: 0.65; cursor: progress; }
+.download-email-field input {
+  display: block;
+  width: 100%;
+  min-height: 50px;
+  padding: 12px 16px;
+  border: 2px solid var(--ink);
+  border-radius: 16px;
+  outline: none;
+  background: transparent;
+  color: var(--ink);
+  font-family: "Avenir Next", Avenir, "Segoe UI", sans-serif;
+  font-size: 1.05rem;
+  line-height: 1.5;
+  box-shadow: none;
+  -webkit-appearance: none;
+  appearance: none;
+}
+.download-email-field input::placeholder { color: #aaa69d; }
+.download-email-field input[aria-invalid="true"] { border-color: var(--error); }
+.download-error { color: var(--error); }
+.download-dialog p.download-error, #download-result-message { margin: 0; font-size: 0.85rem; line-height: 1.5; }
+.modal-primary, .modal-secondary {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  min-height: 46px;
+  padding: 12px 10px;
+  border: 2px solid var(--ink);
+  border-radius: 12px;
+  font-family: "Arial Narrow", "Avenir Next Condensed", "Segoe UI", sans-serif;
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  line-height: 1.4;
+  text-decoration: none;
+  cursor: pointer;
+}
+.modal-primary { background: var(--ink); color: var(--paper); }
+.modal-primary:hover:not(:disabled) { background: #35352f; }
+.modal-primary:disabled { opacity: 0.65; cursor: progress; }
+.modal-secondary { background: var(--paper); color: var(--ink); }
+.modal-secondary:hover { background: var(--stage); }
+#download-progress {
+  width: 100%;
+  height: 18px;
+  margin: 4px 0;
+  overflow: hidden;
+  border: 0;
+  border-radius: 999px;
+  background: var(--stage);
+  accent-color: var(--cheese-deep);
+  -webkit-appearance: none;
+  appearance: none;
+}
+#download-progress::-webkit-progress-bar { background: var(--stage); border-radius: 999px; }
+#download-progress::-webkit-progress-value { background: var(--cheese-deep); border-radius: 999px; }
+#download-progress::-moz-progress-bar { background: var(--cheese-deep); border-radius: 999px; }
+#download-progress:indeterminate::-webkit-progress-bar {
+  background: linear-gradient(90deg, var(--stage) 25%, var(--cheese-deep) 50%, var(--stage) 75%);
+  background-size: 200% 100%;
+  animation: download-progress-wait 1.4s ease-in-out infinite alternate;
+}
+@keyframes download-progress-wait {
+  from { background-position: 100% 0; }
+  to { background-position: 0 0; }
+}
+.download-dialog :is(button, a):focus-visible { outline: 3px solid var(--cheese-deep); outline-offset: 3px; }
+.download-email-field input:focus-visible { outline: 2px solid var(--cheese); outline-offset: 3px; }
+@keyframes download-dialog-enter {
+  from { opacity: 0; transform: translateY(14px) scale(0.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes download-sheet-enter {
+  from { opacity: 0; transform: translateY(28px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes download-backdrop-enter {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@media (max-width: 480px) {
+  .download-dialog-content { padding: 18px; }
+  .download-dialog[open] {
+    animation-name: download-sheet-enter;
+    animation-duration: 340ms;
   }
+}
+@media (prefers-reduced-motion: reduce) {
+  .download-dialog[open],
+  .download-dialog[open]::backdrop { animation: none; }
 }

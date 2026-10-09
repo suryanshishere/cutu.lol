@@ -3,9 +3,12 @@ import { createServer } from "node:http";
 import { extname, resolve, sep } from "node:path";
 import { Resvg } from "@cf-wasm/resvg/node";
 import { applyShareMeta, renderShareCard, shareText } from "./src/share-card.js";
+import { handleEmailIntake } from "./src/email-intake.js";
+import { createLocalEmailStore } from "./src/local-email-store.js";
 
 const port = Number(process.env.PORT || 4173);
 const root = resolve("site");
+const saveEmail = createLocalEmailStore(resolve(".local-data", "emails.json"));
 const shareStamp = readFileSync(resolve(root, "share-stamp.png"));
 const shareFont = readFileSync(resolve(root, "share-lora.woff2"));
 const contentTypes = {
@@ -28,6 +31,22 @@ createServer(async (request, response) => {
     pathname = decodeURIComponent(url.pathname);
   } catch {
     response.writeHead(400).end("Bad request");
+    return;
+  }
+  if (pathname === "/api/email-intake") {
+    try {
+      const apiRequest = new Request(url, {
+        method: request.method,
+        headers: request.headers,
+        ...(!["GET", "HEAD"].includes(request.method) ? { body: request, duplex: "half" } : {})
+      });
+      const result = await handleEmailIntake(apiRequest, saveEmail);
+      response.writeHead(result.status, Object.fromEntries(result.headers));
+      response.end(await result.text());
+    } catch {
+      response.writeHead(503, { "Content-Type": "application/json", "Cache-Control": "no-store" });
+      response.end(JSON.stringify({ error: "Couldn’t save your email. Please try again." }));
+    }
     return;
   }
   if ((request.method === "GET" || request.method === "HEAD") && pathname === "/share-card.png") {

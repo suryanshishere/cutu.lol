@@ -1,5 +1,7 @@
 import { Resvg } from "@cf-wasm/resvg/workerd";
 import { applyShareMeta, renderShareCard, shareText } from "./share-card.js";
+import { handleEmailIntake } from "./email-intake.js";
+export { EmailIntake } from "./email-intake.js";
 
 const SITE_COUNTER_NAME = "hamster-sitewide";
 const VISITOR_COOKIE = "cutu_visitor";
@@ -77,6 +79,20 @@ export class VisitCounter {
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
+
+    if (url.pathname === "/api/email-intake") {
+      return handleEmailIntake(request, async (email) => {
+        const intake = env.EMAIL_INTAKE.get(env.EMAIL_INTAKE.idFromName("download-emails"));
+        // Validate and consume the public request before forwarding a small,
+        // normalized payload. Rejected bodies never reach the Durable Object.
+        const response = await intake.fetch("https://email-intake/", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email })
+        });
+        const result = await response.json();
+        if (!response.ok || result.ok !== true) throw new Error("Email persistence failed");
+      });
+    }
 
     if ((request.method === "GET" || request.method === "HEAD") && url.pathname === "/share-card.png") {
       const headers = {

@@ -10,7 +10,21 @@ Copied links include the text in a generated 1200 × 630 PNG preview card. The s
 npm run dev
 ```
 
-Then open `http://127.0.0.1:4173` in a modern browser. The **Download** menu offers Video and GIF. During export, the main button shows progress around its outline and the menu stays closed. When the file is ready, that button briefly becomes **Save video** or **Save GIF** before returning to the menu. Video export uses the browser's `MediaRecorder` API. It prefers MP4 and falls back to WebM when MP4 recording is unavailable. GIF export uses the bundled MIT-licensed `gifenc` encoder and has no sound. Export uses a lighter resolution on touch devices to keep playback smooth. On mobile, tap the save button after rendering to start the browser's native download. Desktop browsers start the download when rendering finishes. Mobile sharing uses the system share sheet: it shares the rendered video file when supported, or a link containing the text before export.
+Then open `http://127.0.0.1:4173` in a modern browser. **Download** opens a compact modal with the Baby Boo stamp, side-by-side **Video** and **GIF** choices, an outlined email field, and **Continue to download**. Video is selected by default. Choose a format and continue to save the email and start that export in one step. Selecting a format alone does not start rendering.
+
+After successful intake, a completion flag in this browser skips the email field on future visits. No email address is kept in browser storage. If browser storage is unavailable, intake is remembered for the current page.
+
+Export progress and the final save link stay inside the modal. Closing it allows rendering to finish; reopening shows the current state. On mobile, tap **Save video** or **Save GIF** after rendering to start a native download. Desktop browsers start the download when rendering finishes and also retain the save link. **Back** returns to the format picker without asking for email again.
+
+Video export uses the browser's `MediaRecorder` API. It prefers MP4 and falls back to WebM when MP4 recording is unavailable. GIF export uses the bundled MIT-licensed `gifenc` encoder and has no sound. Export uses a lighter resolution on touch devices to keep playback smooth. Mobile sharing uses the system share sheet: it shares the rendered video file when supported, or a link containing the text before export.
+
+### Email intake
+
+`POST /api/email-intake` accepts JSON `{ "email": "you@example.com" }` and returns `{ "ok": true }` only after persistence. Addresses are trimmed, normalized to lowercase, and stored once with their creation timestamp. Invalid addresses or malformed JSON return 400; oversized requests return 413; unsupported content types return 415; unsupported methods return 405; cross-origin submissions return 403. Storage failures return 503 and can be retried. Responses contain no stored addresses and are not cached.
+
+Production stores emails privately in the `EmailIntake` Durable Object, separately from visitor counters, using the `EMAIL_INTAKE` binding and the `v2` migration. There is no public listing endpoint or outgoing email integration. The local Node server stores intake in ignored `.local-data/emails.json`; Cloudflare development uses Wrangler's local Durable Object storage. Do not commit these data files. The email form is masked for Clarity; email values are not added to analytics events, logs, or URLs.
+
+Run `npm run check` for JavaScript syntax checks and the intake/storage tests. Test browser behavior manually with both formats, including keyboard navigation, closing/reopening during export, and mobile's final save tap.
 
 ## Cloudflare
 

@@ -129,21 +129,10 @@
                 <svg id="share-icon" class="button-icon" viewBox="0 0 20 20" aria-hidden="true"><rect x="7" y="6" width="10" height="11" rx="1.5" /><path d="M13 6V4.5A1.5 1.5 0 0 0 11.5 3h-7A1.5 1.5 0 0 0 3 4.5v8A1.5 1.5 0 0 0 4.5 14H7" /></svg>
                 <span id="share-label">Copy Link</span>
               </button>
-              <div class="download-picker">
-                <a id="download-toggle" class="download-button" href="#" role="button" aria-haspopup="true" aria-expanded="false" aria-controls="download-menu">
-                  <span id="download-toggle-label">Download</span>
-                  <svg class="button-icon download-chevron" viewBox="0 0 20 20" aria-hidden="true"><path d="m5 7.5 5 5 5-5" /></svg>
-                  <svg class="download-progress-outline" viewBox="0 0 116 40" preserveAspectRatio="none" aria-hidden="true"><rect x="1.5" y="1.5" width="113" height="37" rx="18.5" pathLength="100" /></svg>
-                </a>
-                <div id="download-menu" class="download-menu" hidden>
-                  <a id="download-button" class="download-option" href="#" download="hamster-type.mp4">
-                    <span id="download-label">Video</span><small>With Sound</small>
-                  </a>
-                  <a id="gif-download-button" class="download-option" href="#" download="hamster-type.gif">
-                    <span id="gif-download-label">GIF</span><small>Silent Loop</small>
-                  </a>
-                </div>
-              </div>
+              <button id="download-toggle" class="download-button" type="button" aria-haspopup="dialog" aria-controls="download-dialog">
+                <svg class="button-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M10 3v9m-3-3 3 3 3-3M4 13v3h12v-3" /></svg>
+                <span>Download</span>
+              </button>
             </div>
           </div>
         </div>
@@ -161,6 +150,35 @@
       </footer>
     </main>
 
+    <dialog id="download-dialog" class="download-dialog" aria-label="Download Baby Boo" tabindex="-1">
+      <div class="download-dialog-content">
+        <button id="download-close" class="download-close" type="button" aria-label="Close download dialog">
+          <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m5 5 10 10M15 5 5 15" /></svg>
+        </button>
+        <img class="download-stamp" src="baby-boo-stamp.png" alt="Baby Boo" />
+        <form id="download-email-form" class="download-email-form" data-clarity-mask="true" novalidate>
+          <fieldset id="download-formats" class="download-formats">
+            <legend class="visually-hidden">Download format</legend>
+            <label class="download-format"><input type="radio" name="format" value="video" checked /><span>Video</span></label>
+            <label class="download-format"><input type="radio" name="format" value="gif" /><span>GIF</span></label>
+          </fieldset>
+          <div id="download-email-field" class="download-email-field">
+            <label for="download-email" class="visually-hidden">Email address</label>
+            <input id="download-email" name="email" type="email" autocomplete="email" inputmode="email" autocapitalize="none" spellcheck="false" maxlength="254" placeholder="Your email" required aria-describedby="download-email-error" />
+          </div>
+          <p id="download-email-error" class="download-error" role="alert" hidden></p>
+          <button id="download-continue" class="modal-primary" type="submit">Continue to download</button>
+        </form>
+        <div id="download-result" class="download-result" hidden>
+          <p id="download-result-message" role="status" aria-live="polite" aria-atomic="true"></p>
+          <progress id="download-progress" max="100" aria-label="Export progress" hidden></progress>
+          <a id="download-save" class="modal-primary" href="#" hidden>Save file</a>
+          <button id="download-another" class="modal-secondary" type="button" hidden>Back</button>
+        </div>
+        <a id="download-button" href="#" download="hamster-type.mp4" hidden><span id="download-label">Video</span></a>
+        <a id="gif-download-button" href="#" download="hamster-type.gif" hidden><span id="gif-download-label">GIF</span></a>
+      </div>
+    </dialog>
     <p id="action-message" class="action-message" role="status" aria-live="polite"></p>
     <canvas id="export-canvas" hidden></canvas>
     <video id="export-video" muted playsinline preload="none" hidden>

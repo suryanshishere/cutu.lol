@@ -7,13 +7,17 @@
   "assets": {
     "directory": "./public",
     "binding": "ASSETS",
-    "run_worker_first": ["/", "/index.html"]
+    "run_worker_first": ["/", "/index.html", "/api/*"]
   },
   "durable_objects": {
     "bindings": [
       {
         "name": "VISIT_COUNTER",
         "class_name": "VisitCounter"
+      },
+      {
+        "name": "EMAIL_INTAKE",
+        "class_name": "EmailIntake"
       }
     ]
   },
@@ -21,6 +25,10 @@
     {
       "tag": "v1",
       "new_sqlite_classes": ["VisitCounter"]
+    },
+    {
+      "tag": "v2",
+      "new_sqlite_classes": ["EmailIntake"]
     }
   ],
   "routes": [

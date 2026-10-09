@@ -7,8 +7,18 @@ const exportVideo = document.querySelector("#export-video");
 const textMeasure = document.querySelector("#text-measure");
 const status = document.querySelector("#status");
 const downloadToggle = document.querySelector("#download-toggle");
-const downloadToggleLabel = document.querySelector("#download-toggle-label");
-const downloadMenu = document.querySelector("#download-menu");
+const downloadDialog = document.querySelector("#download-dialog");
+const emailForm = document.querySelector("#download-email-form");
+const emailInput = document.querySelector("#download-email");
+const emailField = document.querySelector("#download-email-field");
+const emailError = document.querySelector("#download-email-error");
+const emailContinue = document.querySelector("#download-continue");
+const downloadFormats = document.querySelector("#download-formats");
+const downloadResult = document.querySelector("#download-result");
+const downloadResultMessage = document.querySelector("#download-result-message");
+const downloadProgress = document.querySelector("#download-progress");
+const downloadSave = document.querySelector("#download-save");
+const downloadAnother = document.querySelector("#download-another");
 const downloadButton = document.querySelector("#download-button");
 const downloadLabel = document.querySelector("#download-label");
 const gifDownloadButton = document.querySelector("#gif-download-button");
@@ -63,63 +73,138 @@ let downloadPending = false;
 let gifDownloadPending = false;
 let exportSlide = 0;
 let cleanEndFrame;
-let downloadResetTimer;
-let downloadState = "menu";
-let downloadLabelAnimation;
+const EMAIL_INTAKE_KEY = "cutu-email-intake-complete";
+let emailAccepted = false;
+try { emailAccepted = localStorage.getItem(EMAIL_INTAKE_KEY) === "1"; } catch { /* Use page memory when storage is unavailable. */ }
+let emailSubmitting = false;
+let downloadState = "choose";
 let shareResetTimer;
 let actionMessageTimer;
 let editingText = false;
 let manuallyPaused = false;
 
-function setDownloadMenu(open) {
-  if (downloadState !== "menu") open = false;
-  downloadMenu.hidden = !open;
-  downloadToggle.setAttribute("aria-expanded", String(open));
-}
-
 function setDownloadState(state, label, url = "", filename = "") {
-  window.clearTimeout(downloadResetTimer);
+  const previousState = downloadState;
   downloadState = state;
-  setDownloadMenu(false);
-  if (downloadToggleLabel.textContent !== label) {
-    downloadToggleLabel.textContent = label;
-    downloadLabelAnimation?.cancel();
-    if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-      downloadLabelAnimation = downloadToggleLabel.animate([
-        { opacity: 0.35, transform: "translateY(3px)" },
-        { opacity: 1, transform: "translateY(0)" }
-      ], { duration: 220, easing: "ease-out" });
-    }
+  emailForm.hidden = state !== "choose";
+  emailField.hidden = emailAccepted;
+  emailInput.required = !emailAccepted;
+  downloadResult.hidden = state === "choose";
+  downloadProgress.hidden = state !== "rendering";
+  downloadSave.hidden = state !== "ready";
+  downloadAnother.hidden = state !== "ready" && state !== "error";
+  downloadResultMessage.textContent = label || "";
+  downloadResultMessage.classList.toggle("download-error", state === "error");
+  downloadResultMessage.classList.toggle("visually-hidden", state === "ready");
+  downloadToggle.setAttribute("aria-busy", String(state === "rendering"));
+  if (state === "rendering") {
+    const percent = label.match(/(\d+)%/)?.[1];
+    if (percent) downloadProgress.value = Number(percent);
+    else if (label.startsWith("Finishing")) downloadProgress.value = 96;
+    else downloadProgress.removeAttribute("value");
   }
-  downloadToggle.classList.toggle("has-download-state", state !== "menu");
-  downloadToggle.setAttribute("aria-busy", String(state === "busy"));
-  if (state === "busy") {
-    const percent = Number(label.match(/(\d+)%/)?.[1] || (label.startsWith("Finishing") ? 96 : 2));
-    downloadToggle.style.setProperty("--download-progress-dash", String(Math.max(2, percent)));
-  } else if (state === "menu") {
-    downloadToggle.style.setProperty("--download-progress-dash", "0");
+  downloadSave.href = state === "ready" ? url : "#";
+  if (state === "ready") {
+    downloadSave.download = filename;
+    downloadSave.textContent = filename.endsWith(".gif") ? "Save GIF" : "Save video";
+  } else downloadSave.removeAttribute("download");
+  if (downloadDialog.open && previousState !== state) {
+    if (state === "ready") downloadSave.focus();
+    else if (state === "choose") downloadFormats.querySelector("input:checked").focus();
+    else downloadDialog.focus();
   }
-  downloadToggle.href = state === "ready" ? url : "#";
-  if (state === "ready") downloadToggle.download = filename;
-  else downloadToggle.removeAttribute("download");
 }
 
 function resetDownloadState() {
-  setDownloadState("menu", "Download");
+  setDownloadState("choose");
 }
 
 function showDownloadProgress(label) {
-  setDownloadState("busy", label);
+  setDownloadState("rendering", label);
 }
 
 function showDownloadReady(label, url, filename) {
-  setDownloadState("ready", label, url, filename);
-  downloadResetTimer = window.setTimeout(resetDownloadState, 7000);
+  setDownloadState("ready", mobileSaveNeedsTap() ? `Ready — tap ${label}.` : "Your file is ready to save.", url, filename);
 }
 
 function showDownloadSaving(label, url, filename) {
-  setDownloadState("saving", "Saving…");
-  downloadResetTimer = window.setTimeout(() => showDownloadReady(label, url, filename), 1200);
+  setDownloadState("ready", "Download requested. Check your browser’s downloads.", url, filename);
+}
+
+function showDownloadError(message) {
+  setDownloadState("error", message);
+}
+
+function openDownloadDialog() {
+  if (downloadDialog.open) return;
+  // Use the visual viewport so the sheet stays above the mobile keyboard.
+  updateDownloadViewport();
+  downloadDialog.showModal();
+  document.body.classList.add("download-dialog-open");
+  if (downloadState === "choose" && emailAccepted) downloadFormats.querySelector("input:checked").focus();
+  else downloadDialog.focus();
+}
+
+function updateDownloadViewport() {
+  const viewport = window.visualViewport;
+  downloadDialog.style.setProperty("--dialog-viewport-height", `${viewport?.height || window.innerHeight}px`);
+  downloadDialog.style.setProperty("--dialog-viewport-top", `${viewport?.offsetTop || 0}px`);
+}
+
+async function submitDownloadEmail(event) {
+  event.preventDefault();
+  if (emailSubmitting || rendering) return;
+  if (emailAccepted) {
+    startSelectedDownload();
+    return;
+  }
+  emailInput.value = emailInput.value.trim();
+  emailError.hidden = true;
+  emailInput.removeAttribute("aria-invalid");
+  if (!emailInput.checkValidity()) {
+    emailError.textContent = "Enter a valid email address, like you@example.com.";
+    emailError.hidden = false;
+    emailInput.setAttribute("aria-invalid", "true");
+    emailInput.focus();
+    return;
+  }
+  emailSubmitting = true;
+  emailInput.readOnly = true;
+  downloadFormats.disabled = true;
+  emailContinue.disabled = true;
+  emailContinue.textContent = "Saving…";
+  emailForm.setAttribute("aria-busy", "true");
+  try {
+    const response = await fetch("/api/email-intake", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: emailInput.value }), signal: AbortSignal.timeout(15000)
+    });
+    const result = await response.json();
+    if (!response.ok || result.ok !== true) {
+      throw new Error(response.status === 400 ? "Enter a valid email address, like you@example.com." : "Couldn’t save your email. Please try again.");
+    }
+    emailAccepted = true;
+    try { localStorage.setItem(EMAIL_INTAKE_KEY, "1"); } catch { /* Successful intake still unlocks this page. */ }
+    emailInput.value = "";
+    startSelectedDownload();
+  } catch (error) {
+    emailError.textContent = error.message.startsWith("Enter a valid") ? error.message : "Couldn’t save your email. Check your connection and try again.";
+    emailError.hidden = false;
+    if (error.message.startsWith("Enter a valid")) emailInput.setAttribute("aria-invalid", "true");
+  } finally {
+    emailSubmitting = false;
+    emailInput.readOnly = false;
+    downloadFormats.disabled = false;
+    emailContinue.disabled = false;
+    emailContinue.textContent = emailError.hidden ? "Continue to download" : "Try again";
+    emailForm.removeAttribute("aria-busy");
+  }
+}
+
+function startSelectedDownload() {
+  const format = emailForm.elements.format.value;
+  if (format === "gif") gifDownloadButton.click();
+  else downloadButton.click();
 }
 
 function showActionMessage(message, duration = 1800) {
@@ -141,8 +226,8 @@ function isTwitterInAppBrowser() {
 }
 
 function showSwitchBrowserMessage() {
-  setDownloadMenu(false);
   const message = "X may block downloads here. Open this page in Safari or Chrome to save your file.";
+  showDownloadError(message);
   status.textContent = message;
   showActionMessage(message, 0);
 }
@@ -255,8 +340,8 @@ function updateLivePreview() {
     renderedGifBlob = undefined;
     gifDownloadButton.href = "#";
   }
-  downloadLabel.textContent = "Video";
-  gifDownloadLabel.textContent = "GIF";
+  downloadLabel.textContent = "Download video";
+  gifDownloadLabel.textContent = "Download GIF";
   if (!rendering) resetDownloadState();
   actionMessage.classList.remove("is-visible");
   updateShareLabel();
@@ -664,9 +749,9 @@ async function makeVideo(event) {
     status.textContent = "Video export is not supported in this browser.";
     showActionMessage("Video export is not supported in this browser.", 0);
     downloadPending = false;
-    downloadLabel.textContent = "Video";
+    downloadLabel.textContent = "Download video";
     downloadButton.removeAttribute("aria-busy");
-    resetDownloadState();
+    showDownloadError("Video export is not supported in this browser. Try GIF instead.");
     return;
   }
 
@@ -781,9 +866,9 @@ async function makeVideo(event) {
     console.error(error);
     downloadPending = false;
     renderPending = false;
-    downloadLabel.textContent = "Video";
+    downloadLabel.textContent = "Download video";
     downloadButton.removeAttribute("aria-busy");
-    resetDownloadState();
+    showDownloadError("Video export failed. Choose a format to try again.");
     showActionMessage("Video export failed. Try again.", 0);
     status.classList.remove("is-busy");
     status.classList.add("is-error");
@@ -869,7 +954,7 @@ async function makeGif() {
       }
     } else {
       gifDownloadPending = false;
-      gifDownloadLabel.textContent = "GIF";
+      gifDownloadLabel.textContent = "Download GIF";
       gifDownloadButton.removeAttribute("aria-busy");
       status.textContent = "Text changed — ready to export";
       resetDownloadState();
@@ -878,9 +963,9 @@ async function makeGif() {
   } catch (error) {
     console.error(error);
     gifDownloadPending = false;
-    gifDownloadLabel.textContent = "GIF";
+    gifDownloadLabel.textContent = "Download GIF";
     gifDownloadButton.removeAttribute("aria-busy");
-    resetDownloadState();
+    showDownloadError("GIF export failed. Choose a format to try again.");
     showActionMessage("GIF export failed. Try again.", 0);
     status.classList.remove("is-busy");
     status.classList.add("is-error");
@@ -894,6 +979,12 @@ async function makeGif() {
 }
 
 function downloadVideo(event) {
+  if (!emailAccepted) {
+    event.preventDefault();
+    resetDownloadState();
+    openDownloadDialog();
+    return;
+  }
   if (isTwitterInAppBrowser()) {
     event.preventDefault();
     showSwitchBrowserMessage();
@@ -926,6 +1017,12 @@ function saveRenderedVideo() {
 }
 
 function downloadGif(event) {
+  if (!emailAccepted) {
+    event.preventDefault();
+    resetDownloadState();
+    openDownloadDialog();
+    return;
+  }
   if (isTwitterInAppBrowser()) {
     event.preventDefault();
     showSwitchBrowserMessage();
@@ -1060,33 +1157,56 @@ characterStamp.addEventListener("click", () => {
 });
 downloadButton.addEventListener("click", downloadVideo);
 gifDownloadButton.addEventListener("click", downloadGif);
-downloadToggle.addEventListener("click", (event) => {
-  if (downloadState === "ready") {
-    const label = downloadToggleLabel.textContent;
-    const url = downloadToggle.href;
-    const filename = downloadToggle.download;
-    status.textContent = "Download requested";
-    window.setTimeout(() => showDownloadSaving(label, url, filename), 0);
-    return;
-  }
-  event.preventDefault();
-  if (downloadState === "menu") setDownloadMenu(downloadMenu.hidden);
+downloadToggle.addEventListener("click", openDownloadDialog);
+emailForm.addEventListener("submit", submitDownloadEmail);
+emailInput.addEventListener("input", () => {
+  emailInput.removeAttribute("aria-invalid");
+  emailError.hidden = true;
+  if (!emailSubmitting) emailContinue.textContent = "Continue to download";
 });
-downloadToggle.addEventListener("keydown", (event) => {
-  if (event.key === " ") {
+document.querySelector("#download-close").addEventListener("click", () => downloadDialog.close());
+downloadDialog.addEventListener("keydown", (event) => {
+  if (event.key !== "Tab") return;
+  const controls = [...downloadDialog.querySelectorAll('button:not(:disabled), a[href], input:not(:disabled)')]
+    .filter((control) => control.getClientRects().length > 0);
+  const first = controls[0];
+  const last = controls.at(-1);
+  const active = document.activeElement;
+  if (event.shiftKey && (active === first || !controls.includes(active))) {
     event.preventDefault();
-    downloadToggle.click();
+    last?.focus();
+  } else if (!event.shiftKey && (active === last || !controls.includes(active))) {
+    event.preventDefault();
+    first?.focus();
   }
 });
-document.addEventListener("pointerdown", (event) => {
-  if (!event.target.closest(".download-picker")) setDownloadMenu(false);
+let backdropPointerDown = false;
+downloadDialog.addEventListener("pointerdown", (event) => {
+  const bounds = downloadDialog.getBoundingClientRect();
+  backdropPointerDown = event.clientX < bounds.left || event.clientX > bounds.right || event.clientY < bounds.top || event.clientY > bounds.bottom;
 });
-document.addEventListener("keydown", (event) => {
-  if (event.key === "Escape" && !downloadMenu.hidden) {
-    setDownloadMenu(false);
-    downloadToggle.focus();
-  }
+downloadDialog.addEventListener("click", (event) => {
+  const bounds = downloadDialog.getBoundingClientRect();
+  const outside = event.clientX < bounds.left || event.clientX > bounds.right || event.clientY < bounds.top || event.clientY > bounds.bottom;
+  if (backdropPointerDown && outside) downloadDialog.close();
+  backdropPointerDown = false;
 });
+downloadDialog.addEventListener("close", () => {
+  document.body.classList.remove("download-dialog-open");
+  downloadToggle.focus({ preventScroll: true });
+});
+downloadAnother.addEventListener("click", () => {
+  downloadLabel.textContent = "Download video";
+  gifDownloadLabel.textContent = "Download GIF";
+  resetDownloadState();
+});
+downloadSave.addEventListener("click", () => {
+  status.textContent = "Download requested";
+  downloadResultMessage.textContent = "Download requested. Check your browser’s downloads.";
+});
+window.visualViewport?.addEventListener("resize", updateDownloadViewport);
+window.visualViewport?.addEventListener("scroll", updateDownloadViewport);
+window.addEventListener("resize", updateDownloadViewport);
 form.addEventListener("submit", (event) => event.preventDefault());
 
 const sharedText = new URLSearchParams(location.search).get("text");
