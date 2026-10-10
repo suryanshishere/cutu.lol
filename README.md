@@ -1,8 +1,10 @@
 # cutu.lol
 
-A browser based Baby Boo hamster meme maker. Add text, preview it over the looping hamster clip, then download a video with sound or a silent looping GIF. You can also share a link that opens with your text. The visitor counters count each browser once per day and once overall, using a one-year visitor cookie and a Cloudflare Durable Object.
+A browser-based personalized meme maker. Choose a famous meme, add your text, then download a video with sound or a silent looping GIF. Baby Boo is selected by default at `/`. You can also share a link that opens with your text. The visitor counters count each browser once per day and once overall, using a one-year visitor cookie and a Cloudflare Durable Object.
 
-Copied links include the text in a generated 1200 × 630 PNG preview card. The server adds matching Open Graph and Twitter metadata to each shared URL so messaging and social platforms can display the card. The card template uses the Baby Boo stamp and the bundled Lora font (see `site/share-font-LICENSE.txt`).
+Choose **Baby Boo** or **Speed** using the stamps beneath the preview. Speed uses the supplied transparent WebM, with your text behind the animation. Both stamps use the same playback, email intake, Video/GIF download, and sharing controls. Baby Boo supports sound; Speed hides the sound control and exports without an audio track. Switching back to Baby Boo restores the sound button. Shared Speed links include `stamp=speed` and generate a matching preview card; existing links still default to Baby Boo. Stamp selection is locked while an export is rendering. The picker uses equally sized, unlabeled stamps with accessible names and tooltips. Both videos and exports use Baby Boo?s 16:9 frame; Speed is contained at 70% scale and anchored to the bottom-left, with text on the right, while Baby Boo retains its original scale.
+
+Copied links include the text in a generated 1200 × 630 PNG preview card. The server adds matching Open Graph and Twitter metadata to each shared URL so messaging and social platforms can display the card. Cards use the selected meme?s postage-stamp artwork and the bundled Lora font (see `site/share-font-LICENSE.txt`). Speed?s stamp matches Baby Boo?s aged-paper, engraved-ink style.
 
 ## Run
 
@@ -10,7 +12,7 @@ Copied links include the text in a generated 1200 × 630 PNG preview card. The s
 npm run dev
 ```
 
-Then open `http://127.0.0.1:4173` in a modern browser. **Download** opens a compact modal with the Baby Boo stamp, side-by-side **Video** and **GIF** choices, an outlined email field, and **Continue to download**. Video is selected by default. Choose a format and continue to save the email and start that export in one step. Selecting a format alone does not start rendering.
+Then open `http://127.0.0.1:4173` in a modern browser. **Download** opens a compact modal with the selected meme stamp, side-by-side **Video** and **GIF** choices, an outlined email field, and **Continue to download**. Video is selected by default. Choose a format and continue to save the email and start that export in one step. Selecting a format alone does not start rendering.
 
 After successful intake, a completion flag in this browser skips the email field on future visits. No email address is kept in browser storage. If browser storage is unavailable, intake is remembered for the current page.
 
@@ -24,7 +26,7 @@ Video export uses the browser's `MediaRecorder` API. It prefers MP4 and falls ba
 
 Production stores emails privately in the `EmailIntake` Durable Object, separately from visitor counters, using the `EMAIL_INTAKE` binding and the `v2` migration. Email listing requires an authenticated admin session. There is no outgoing email integration. The local Node server stores intake in ignored `.local-data/emails.json`; Cloudflare development uses Wrangler's local Durable Object storage. Do not commit these data files. The email form is masked for Clarity; email values are not added to analytics events, logs, or URLs.
 
-Run `npm run check` for JavaScript syntax checks and the intake/storage tests. Test browser behavior manually with both formats, including keyboard navigation, closing/reopening during export, and mobile's final save tap.
+Run `npm run check` for syntax checks across all JavaScript modules and the admin, intake/storage, metadata, sharing, PNG-rendering, and local HTTP tests. Verify browser behavior manually with both formats, including keyboard navigation, closing/reopening during export, stamp switching, sound, mobile layout, and mobile?s final save tap.
 
 ### Admin
 
@@ -35,6 +37,28 @@ Set `ADMIN_EMAIL` and `ADMIN_PASSWORD_HASH` as Cloudflare Worker secrets. Genera
 Admin APIs live under `/api/admin/`: `POST login`, `GET session`, `GET dashboard?offset=0`, and `POST logout`. Login/logout require same-origin JSON requests. Login attempts are limited to eight per IP per 15 minutes. Sessions expire after eight hours, use HttpOnly/SameSite=Strict cookies (Secure over HTTPS), and are revoked on logout or credential changes. Protected responses are never cached. Dashboard pages contain at most 100 records; the admin UI loads all pages for local search. The private Durable Object stores sessions separately from email records and cleans expired authentication records and download request IDs daily once event tracking begins.
 
 Local Node development uses in-memory sessions and download counters, and shows visitor counts as unavailable. Use Wrangler development to test persistent counters and Durable Object behavior. `POST /api/download-event` records a format and random request ID; it receives no email or password.
+
+
+## Templates, SEO, and sharing
+
+`site/memes.js` is the shared registry for browser playback, export filenames, artwork, defaults, descriptions, and URL helpers. Add template definitions there; the server renders the stamp picker from the registry. `site/app.js` coordinates selection and preview positioning; `text-layout.js`, `media.js`, `download-dialog.js`, and `sharing.js` own their respective behavior.
+
+`src/json-body.js` reads bounded JSON streams for email intake and admin APIs, with each endpoint retaining its own byte limit and error messages. `src/download-events.js` validates download requests for both the local server and Durable Object; storage stays specific to each environment. Generated assets in `public/` are rebuilt from `site/` and are safe to replace; `.local-data/` and Wrangler storage contain persistent data and must be retained.
+
+The homepage has general meme-maker metadata, WebSite/WebApplication structured data. `src/page-meta.js` supplies server-rendered titles, Open Graph/X metadata, structured data, and initial template content for both the Node server and Cloudflare Worker. Query variants use the homepage as their canonical URL; only the homepage belongs in the sitemap. Admin pages remain noindex.
+
+Existing `/?text=...` and `/?stamp=speed&text=...` links continue to work. Unknown stamps default to Baby Boo. Text uses a shared 120 UTF-16-unit limit, preserving line breaks and complete emoji at the boundary. Empty text uses the selected template?s default. Personalized cards remain at `/share-card.png?text=...&stamp=speed`; new metadata includes a `v=2` artwork version to bypass old preview-image caches. Platforms may still cache previously shared page previews.
+
+The Worker handles GET and HEAD page requests through the same renderer; HEAD does not increment visitor totals. Keep the durable object names, cookie names, and `hamster-sitewide` counter identity stable: they refer to existing data, rather than public branding.
+
+To validate Cloudflare packaging without deploying:
+
+```powershell
+npm run prepare:public
+npx wrangler deploy --dry-run
+```
+
+Speed artwork was edited with the built-in image-generation tool; see [artwork prompt](docs/stamp-artwork.md).
 
 ## Cloudflare
 

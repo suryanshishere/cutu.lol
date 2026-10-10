@@ -5,40 +5,26 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#ffffff" />
     <title>cutu</title>
-    <meta name="description" content="Create a Baby Boo hamster meme with your own text. Preview the animated video, then download it or share a link for free." />
+    <meta name="description" content="Create personalized memes with your own text. Choose Baby Boo or Speed, preview your animated meme, then download a video or GIF or share a personalized link for free." />
     <meta name="robots" content="index,follow,max-image-preview:large" />
     <meta name="google-site-verification" content="vzrPIiZ7tRgYaLpPQ-3Cl6yXa6dzY9GOGQ6ArnPPk9w" />
     <link rel="canonical" href="https://cutu.suryansh.lol/" />
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="cutu" />
-    <meta property="og:title" content="Baby Boo Hamster Meme Maker | cutu" />
-    <meta property="og:description" content="Add your text to Baby Boo, preview the animated hamster meme, then download or share it for free." />
+    <meta property="og:title" content="Personalized Meme Maker | cutu" />
+    <meta property="og:description" content="Create personalized memes with your own text. Choose Baby Boo or Speed, preview your animated meme, then download a video or GIF or share a personalized link for free." />
     <meta property="og:url" content="https://cutu.suryansh.lol/" />
-    <meta property="og:image" content="https://cutu.suryansh.lol/share-card.png" />
+    <meta property="og:image" content="https://cutu.suryansh.lol/share-card.png?v=2" />
     <meta property="og:image:type" content="image/png" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
-    <meta property="og:image:alt" content="Baby Boo hamster meme card" />
+    <meta property="og:image:alt" content="Baby Boo postage stamp with the message: Small steps. Big wheel energy." />
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="Baby Boo Hamster Meme Maker | cutu" />
-    <meta name="twitter:description" content="Add your text to Baby Boo, preview the animated hamster meme, then download or share it for free." />
-    <meta name="twitter:image" content="https://cutu.suryansh.lol/share-card.png" />
-    <meta name="twitter:image:alt" content="Baby Boo hamster meme card" />
-    <script type="application/ld+json">
-      {
-        "@context": "https://schema.org",
-        "@type": "WebApplication",
-        "name": "Baby Boo Hamster Meme Maker",
-        "url": "https://cutu.suryansh.lol/",
-        "description": "Create a Baby Boo hamster meme with your own text. Preview the animated video, then download it or share a link for free.",
-        "image": "https://cutu.suryansh.lol/baby-boo-stamp.png",
-        "applicationCategory": "MultimediaApplication",
-        "operatingSystem": "Any",
-        "inLanguage": "en",
-        "isAccessibleForFree": true,
-        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" }
-      }
-    </script>
+    <meta name="twitter:title" content="Personalized Meme Maker | cutu" />
+    <meta name="twitter:description" content="Create personalized memes with your own text. Choose Baby Boo or Speed, preview your animated meme, then download a video or GIF or share a personalized link for free." />
+    <meta name="twitter:image" content="https://cutu.suryansh.lol/share-card.png?v=2" />
+    <meta name="twitter:image:alt" content="Baby Boo postage stamp with the message: Small steps. Big wheel energy." />
+    <script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"WebSite","@id":"https://cutu.suryansh.lol/#website","name":"cutu","url":"https://cutu.suryansh.lol/"},{"@type":"WebApplication","@id":"https://cutu.suryansh.lol/#app","name":"cutu Personalized Meme Maker","url":"https://cutu.suryansh.lol/","description":"Create personalized memes with your own text. Choose Baby Boo or Speed, preview your animated meme, then download a video or GIF or share a personalized link for free.","image":"https://cutu.suryansh.lol/share-card.png?v=2","applicationCategory":"MultimediaApplication","operatingSystem":"Any","inLanguage":"en","isAccessibleForFree":true,"offers":{"@type":"Offer","price":"0","priceCurrency":"USD"}},{"@type":"WebPage","name":"Personalized Meme Maker | cutu","description":"Create personalized memes with your own text. Choose Baby Boo or Speed, preview your animated meme, then download a video or GIF or share a personalized link for free.","url":"https://cutu.suryansh.lol/","image":"https://cutu.suryansh.lol/share-card.png?v=2","isPartOf":{"@id":"https://cutu.suryansh.lol/#website"},"about":{"@id":"https://cutu.suryansh.lol/#app"}}]}</script>
     <link rel="icon" type="image/png" href="/baby-boo-stamp.png" />
     <link rel="stylesheet" href="styles.css" />
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-B04H26G5QT"></script>
@@ -75,7 +61,7 @@
         </div>
       </header>
 
-      <section class="workspace">
+      <section class="workspace" aria-label="Meme editor">
         <div class="composer">
           <form id="text-form" class="text-form">
             <label for="message">Type Your Text</label>
@@ -89,32 +75,33 @@
                 aria-label="Video Text"
                 placeholder="Type Something..."
               >Small steps. Big wheel energy.</textarea>
-              <div id="text-measure" class="text-measure" aria-hidden="true"></div>
             </div>
             <p id="status" class="visually-hidden" role="status" aria-live="polite">Ready</p>
           </form>
         </div>
 
         <div class="preview-column">
-          <div id="stage" class="stage" aria-label="Video Preview">
+          <div id="stage" class="stage" data-stamp="baby-boo" aria-label="Baby Boo Video Preview">
             <div id="preview-text" class="preview-text is-right"></div>
             <video
-              id="hamster-video"
-              class="hamster-video"
+              id="meme-video"
+              class="meme-video"
               loop
               muted
               playsinline
               preload="auto"
-            >
-              <source src="hamster-preview.webm" type="video/webm; codecs=&quot;vp9, opus&quot;" />
-              <source src="hamster-fallback.mp4" type="video/mp4" />
-            </video>
+            ><source src="/hamster-preview.webm" type="video/webm; codecs=&quot;vp9, opus&quot;" /><source src="/hamster-fallback.mp4" type="video/mp4" /></video>
           </div>
 
           <div class="preview-tools">
-            <button id="character-stamp" class="character-stamp is-selected" type="button" aria-label="Baby Boo Stamp" title="Baby Boo" aria-pressed="true">
-              <img src="baby-boo-stamp.png" alt="" />
-            </button>
+            <div class="stamp-picker" role="group" aria-label="Choose a stamp">
+              <button id="character-stamp" class="character-stamp is-selected" data-stamp="baby-boo" type="button" aria-label="Baby Boo" title="Baby Boo" aria-pressed="true">
+                <img src="baby-boo-stamp.png" alt="" />
+              </button>
+              <button id="speed-stamp" class="character-stamp" data-stamp="speed" type="button" aria-label="Speed" title="Speed" aria-pressed="false">
+                <img src="/speed-stamp.png?v=2" alt="" />
+              </button>
+            </div>
             <div class="output-actions">
               <div class="stage-controls" aria-label="Preview Controls">
                 <button id="sound-button" class="stage-control" type="button" aria-pressed="false" aria-label="Turn Sound On" title="Turn Sound On">
@@ -155,7 +142,7 @@
         <button id="download-close" class="download-close" type="button" aria-label="Close download dialog">
           <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m5 5 10 10M15 5 5 15" /></svg>
         </button>
-        <img class="download-stamp" src="baby-boo-stamp.png" alt="Baby Boo" />
+        <img class="download-stamp" src="/baby-boo-stamp.png" alt="Baby Boo" />
         <form id="download-email-form" class="download-email-form" data-clarity-mask="true" novalidate>
           <fieldset id="download-formats" class="download-formats">
             <legend class="visually-hidden">Download format</legend>
@@ -181,10 +168,7 @@
     </dialog>
     <p id="action-message" class="action-message" role="status" aria-live="polite"></p>
     <canvas id="export-canvas" hidden></canvas>
-    <video id="export-video" muted playsinline preload="none" hidden>
-      <source src="hamster-export.webm" type="video/webm; codecs=&quot;vp9, opus&quot;" />
-      <source src="hamster-fallback.mp4" type="video/mp4" />
-    </video>
+    <video id="export-video" muted playsinline preload="none" hidden><source src="/hamster-export.webm" type="video/webm; codecs=&quot;vp9, opus&quot;" /><source src="/hamster-fallback.mp4" type="video/mp4" /></video>
     <script type="module" src="app.js"></script>
   </body>
 </html>

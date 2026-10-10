@@ -1,4 +1,6 @@
-import { createAdminStore, dashboardPage, handleAdminRequest, adminResponse, readAdminBody } from "./admin.js";
+import { createAdminStore, dashboardPage, handleAdminRequest } from "./admin.js";
+import { readJsonBody } from "./json-body.js";
+import { DOWNLOAD_EVENT_TTL_MS, handleDownloadEvent } from "./download-events.js";
 
 const MAX_BODY_BYTES = 1024;
 
@@ -18,40 +20,13 @@ export async function handleEmailIntake(request, saveEmail) {
   if (request.method !== "POST") return reply({ error: "Method not allowed." }, 405, { Allow: "POST" });
   const origin = request.headers.get("Origin");
   if (origin && origin !== new URL(request.url).origin) return reply({ error: "Please submit from this website." }, 403);
-  if (request.headers.get("Content-Type")?.split(";")[0].trim().toLowerCase() !== "application/json") {
-    return reply({ error: "Send a JSON email address." }, 415);
-  }
-  if (Number(request.headers.get("Content-Length")) > MAX_BODY_BYTES) return reply({ error: "Request is too large." }, 413);
-
-  let payload;
-  try {
-    const reader = request.body?.getReader();
-    if (!reader) return reply({ error: "Enter a valid email address." }, 400);
-    const chunks = [];
-    let size = 0;
-    try {
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        size += value.byteLength;
-        if (size > MAX_BODY_BYTES) return reply({ error: "Request is too large." }, 413);
-        chunks.push(value);
-      }
-    } finally {
-      reader.releaseLock();
-    }
-    const bytes = new Uint8Array(size);
-    let offset = 0;
-    for (const chunk of chunks) {
-      bytes.set(chunk, offset);
-      offset += chunk.byteLength;
-    }
-    payload = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes));
-  } catch {
-    return reply({ error: "Enter a valid email address." }, 400);
+  const parsed = await readJsonBody(request, { maxBytes: MAX_BODY_BYTES });
+  if (parsed.status) {
+    const messages = { 415: "Send a JSON email address.", 413: "Request is too large.", 400: "Enter a valid email address." };
+    return reply({ error: messages[parsed.status] }, parsed.status);
   }
 
-  const email = normalizeEmail(payload?.email);
+  const email = normalizeEmail(parsed.value?.email);
   if (!email) return reply({ error: "Enter a valid email address, like you@example.com." }, 400);
   try {
     await saveEmail(email);
@@ -88,21 +63,16 @@ export class EmailIntake {
       });
     }
     if (url.pathname === "/api/download-event") {
-      if (request.method !== "POST") return adminResponse({ error: "Method not allowed." }, 405, { Allow: "POST" });
-      if (request.headers.get("Origin") !== url.origin) return adminResponse({ error: "Invalid origin." }, 403);
-      const parsed = await readAdminBody(request);
-      if (parsed.error) return parsed.error;
-      const { format, id } = parsed.value;
-      if (!["video", "gif"].includes(format) || typeof id !== "string" || !/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i.test(id)) return adminResponse({ error: "Invalid download event." }, 400);
-      await this.state.storage.transaction(async (storage) => {
-        const key = `download:${id}`;
-        if (await storage.get(key)) return;
-        const counts = (await storage.get("stats:downloads")) || { video: 0, gif: 0 };
-        counts[format] += 1;
-        await storage.put({ "stats:downloads": counts, [key]: Date.now() });
+      return handleDownloadEvent(request, async ({ format, id }) => {
+        await this.state.storage.transaction(async (storage) => {
+          const key = `download:${id}`;
+          if (await storage.get(key)) return;
+          const counts = (await storage.get("stats:downloads")) || { video: 0, gif: 0 };
+          counts[format] += 1;
+          await storage.put({ "stats:downloads": counts, [key]: Date.now() });
+        });
+        if (!await this.state.storage.getAlarm()) await this.state.storage.setAlarm(Date.now() + DOWNLOAD_EVENT_TTL_MS);
       });
-      if (!await this.state.storage.getAlarm()) await this.state.storage.setAlarm(Date.now() + 24 * 60 * 60 * 1000);
-      return adminResponse({ ok: true });
     }
     return handleEmailIntake(request, (email) => this.state.storage.transaction(async (storage) => {
       const key = `email:${email}`;
@@ -113,7 +83,7 @@ export class EmailIntake {
   }
 
   async alarm() {
-    const cutoff = Date.now() - 24 * 60 * 60 * 1000;
+    const cutoff = Date.now() - DOWNLOAD_EVENT_TTL_MS;
     for (const prefix of ["download:", "admin:session:", "admin:attempt:"]) {
       let startAfter;
       while (true) {
@@ -124,6 +94,6 @@ export class EmailIntake {
         startAfter = [...page.keys()].at(-1);
       }
     }
-    await this.state.storage.setAlarm(Date.now() + 24 * 60 * 60 * 1000);
+    await this.state.storage.setAlarm(Date.now() + DOWNLOAD_EVENT_TTL_MS);
   }
 }

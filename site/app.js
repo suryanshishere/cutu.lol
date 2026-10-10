@@ -1,216 +1,39 @@
+import { MEMES, DEFAULT_STAMP, MAX_TEXT_LENGTH, FRAME_ASPECT_RATIO, getMeme, normalizeText, readMemeUrl } from "./memes.js";
+import { layoutText } from "./text-layout.js";
+import { createMediaController } from "./media.js";
+import { createDownloadDialog } from "./download-dialog.js";
+import { createSharingController } from "./sharing.js";
+
 const form = document.querySelector("#text-form");
 const messageInput = document.querySelector("#message");
 const previewText = document.querySelector("#preview-text");
 const stage = document.querySelector("#stage");
-const hamsterVideo = document.querySelector("#hamster-video");
+const previewVideo = document.querySelector("#meme-video");
 const exportVideo = document.querySelector("#export-video");
-const textMeasure = document.querySelector("#text-measure");
 const status = document.querySelector("#status");
-const downloadToggle = document.querySelector("#download-toggle");
-const downloadDialog = document.querySelector("#download-dialog");
-const emailForm = document.querySelector("#download-email-form");
-const emailInput = document.querySelector("#download-email");
-const emailField = document.querySelector("#download-email-field");
-const emailError = document.querySelector("#download-email-error");
-const emailContinue = document.querySelector("#download-continue");
-const downloadFormats = document.querySelector("#download-formats");
-const downloadResult = document.querySelector("#download-result");
-const downloadResultMessage = document.querySelector("#download-result-message");
-const downloadProgress = document.querySelector("#download-progress");
-const downloadSave = document.querySelector("#download-save");
-const downloadAnother = document.querySelector("#download-another");
-const downloadButton = document.querySelector("#download-button");
-const downloadLabel = document.querySelector("#download-label");
-const gifDownloadButton = document.querySelector("#gif-download-button");
-const gifDownloadLabel = document.querySelector("#gif-download-label");
-const soundButton = document.querySelector("#sound-button");
-const soundLabel = document.querySelector("#sound-label");
-const soundIcon = document.querySelector("#sound-icon");
-const playButton = document.querySelector("#play-button");
-const playIcon = document.querySelector("#play-icon");
-const shareButton = document.querySelector("#share-button");
-const shareLabel = document.querySelector("#share-label");
-const shareIcon = document.querySelector("#share-icon");
-const characterStamp = document.querySelector("#character-stamp");
+const stampButtons = [...document.querySelectorAll(".character-stamp[data-stamp]")];
 const actionMessage = document.querySelector("#action-message");
-const exportCanvas = document.querySelector("#export-canvas");
-const exportContext = exportCanvas.getContext("2d", { alpha: false });
 const previewMeasureContext = document.createElement("canvas").getContext("2d");
-const textLayoutCache = new Map();
 const analysisCanvas = document.createElement("canvas");
-analysisCanvas.width = 96;
-analysisCanvas.height = 54;
-const analysisContext = analysisCanvas.getContext("2d", { willReadFrequently: true });
 const todayViewers = document.querySelector("#today-viewers");
 const totalVisits = document.querySelector("#total-visits");
 const siteStats = document.querySelector(".site-stats");
-
-const DESKTOP_LONG_EDGE = 960;
-const MOBILE_LONG_EDGE = 720;
-const GIF_LONG_EDGE = 480;
-const GIF_FPS = 10;
-// Keep the complete source timeline; the WebM already has a transparent matte.
-const CLEAN_VIDEO_START = 0;
-let renderedUrl = "";
-let renderedGifUrl = "";
-let rendering = false;
-let soundEnabled = false;
-let soundUnlocked = false;
+analysisCanvas.width = 96;
+analysisCanvas.height = 54;
+const analysisContext = analysisCanvas.getContext("2d", { willReadFrequently: true });
+let selectedStamp = DEFAULT_STAMP;
 let textSide = "right";
-let audioContext;
-let previewMediaSource;
-let exportMediaSource;
-let exportVersion = -1;
-let recorderAudioDestination;
-let monitorGain;
-let renderedBlob;
-let renderedFilename = "hamster-type.mp4";
-let renderedGifBlob;
-let gifVersion = -1;
 let messageVersion = 0;
-let renderPending = false;
-let downloadPending = false;
-let gifDownloadPending = false;
-let exportSlide = 0;
-let cleanEndFrame;
-const EMAIL_INTAKE_KEY = "cutu-email-intake-complete";
-let emailAccepted = false;
-try { emailAccepted = localStorage.getItem(EMAIL_INTAKE_KEY) === "1"; } catch { /* Use page memory when storage is unavailable. */ }
-let emailSubmitting = false;
-let downloadState = "choose";
-let shareResetTimer;
 let actionMessageTimer;
-let editingText = false;
-let manuallyPaused = false;
-
-function setDownloadState(state, label, url = "", filename = "") {
-  const previousState = downloadState;
-  downloadState = state;
-  emailForm.hidden = state !== "choose";
-  emailField.hidden = emailAccepted;
-  emailInput.required = !emailAccepted;
-  downloadResult.hidden = state === "choose";
-  downloadProgress.hidden = state !== "rendering";
-  downloadSave.hidden = state !== "ready";
-  downloadAnother.hidden = state !== "ready" && state !== "error";
-  downloadResultMessage.textContent = label || "";
-  downloadResultMessage.classList.toggle("download-error", state === "error");
-  downloadResultMessage.classList.toggle("visually-hidden", state === "ready");
-  downloadToggle.setAttribute("aria-busy", String(state === "rendering"));
-  if (state === "rendering") {
-    const percent = label.match(/(\d+)%/)?.[1];
-    if (percent) downloadProgress.value = Number(percent);
-    else if (label.startsWith("Finishing")) downloadProgress.value = 96;
-    else downloadProgress.removeAttribute("value");
-  }
-  downloadSave.href = state === "ready" ? url : "#";
-  if (state === "ready") {
-    downloadSave.download = filename;
-    downloadSave.textContent = filename.endsWith(".gif") ? "Save GIF" : "Save video";
-  } else downloadSave.removeAttribute("download");
-  if (downloadDialog.open && previousState !== state) {
-    if (state === "ready") downloadSave.focus();
-    else if (state === "choose") downloadFormats.querySelector("input:checked").focus();
-    else downloadDialog.focus();
-  }
-}
-
-function resetDownloadState() {
-  setDownloadState("choose");
-}
-
-function showDownloadProgress(label) {
-  setDownloadState("rendering", label);
-}
-
-function showDownloadReady(label, url, filename) {
-  setDownloadState("ready", mobileSaveNeedsTap() ? `Ready — tap ${label}.` : "Your file is ready to save.", url, filename);
-}
-
-function showDownloadSaving(label, url, filename) {
-  setDownloadState("ready", "Download requested. Check your browser’s downloads.", url, filename);
-}
-
-function showDownloadError(message) {
-  setDownloadState("error", message);
-}
-
-function openDownloadDialog() {
-  if (downloadDialog.open) return;
-  // Use the visual viewport so the sheet stays above the mobile keyboard.
-  updateDownloadViewport();
-  downloadDialog.showModal();
-  document.body.classList.add("download-dialog-open");
-  if (downloadState === "choose" && emailAccepted) downloadFormats.querySelector("input:checked").focus();
-  else downloadDialog.focus();
-}
-
-function updateDownloadViewport() {
-  const viewport = window.visualViewport;
-  downloadDialog.style.setProperty("--dialog-viewport-height", `${viewport?.height || window.innerHeight}px`);
-  downloadDialog.style.setProperty("--dialog-viewport-top", `${viewport?.offsetTop || 0}px`);
-}
-
-async function submitDownloadEmail(event) {
-  event.preventDefault();
-  if (emailSubmitting || rendering) return;
-  if (emailAccepted) {
-    startSelectedDownload();
-    return;
-  }
-  emailInput.value = emailInput.value.trim();
-  emailError.hidden = true;
-  emailInput.removeAttribute("aria-invalid");
-  if (!emailInput.checkValidity()) {
-    emailError.textContent = "Enter a valid email address, like you@example.com.";
-    emailError.hidden = false;
-    emailInput.setAttribute("aria-invalid", "true");
-    emailInput.focus();
-    return;
-  }
-  emailSubmitting = true;
-  emailInput.readOnly = true;
-  downloadFormats.disabled = true;
-  emailContinue.disabled = true;
-  emailContinue.textContent = "Saving…";
-  emailForm.setAttribute("aria-busy", "true");
-  try {
-    const response = await fetch("/api/email-intake", {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email: emailInput.value }), signal: AbortSignal.timeout(15000)
-    });
-    const result = await response.json();
-    if (!response.ok || result.ok !== true) {
-      throw new Error(response.status === 400 ? "Enter a valid email address, like you@example.com." : "Couldn’t save your email. Please try again.");
-    }
-    emailAccepted = true;
-    try { localStorage.setItem(EMAIL_INTAKE_KEY, "1"); } catch { /* Successful intake still unlocks this page. */ }
-    emailInput.value = "";
-    startSelectedDownload();
-  } catch (error) {
-    emailError.textContent = error.message.startsWith("Enter a valid") ? error.message : "Couldn’t save your email. Check your connection and try again.";
-    emailError.hidden = false;
-    if (error.message.startsWith("Enter a valid")) emailInput.setAttribute("aria-invalid", "true");
-  } finally {
-    emailSubmitting = false;
-    emailInput.readOnly = false;
-    downloadFormats.disabled = false;
-    emailContinue.disabled = false;
-    emailContinue.textContent = emailError.hidden ? "Continue to download" : "Try again";
-    emailForm.removeAttribute("aria-busy");
-  }
-}
-
-function startSelectedDownload() {
-  const format = emailForm.elements.format.value;
-  fetch("/api/download-event", {
-    method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ format, id: crypto.randomUUID() }), keepalive: true
-  }).catch(() => {});
-  if (format === "gif") gifDownloadButton.click();
-  else downloadButton.click();
-}
-
+const getStamp = () => getMeme(selectedStamp);
+const getMessage = () => normalizeText(messageInput.value) || getStamp().defaultText;
+const downloads = createDownloadDialog({ isRendering: () => media.rendering });
+const media = createMediaController({
+  getStamp, getMessage, getMessageVersion: () => messageVersion,
+  sideOppositeCharacter, setTextSide, syncTextToCharacter, showActionMessage, downloads,
+  onExportChanged: () => sharing.updateShareLabel()
+});
+const sharing = createSharingController({ media, getStamp, getMessage, showActionMessage });
 function showActionMessage(message, duration = 1800) {
   actionMessage.classList.remove("is-visible");
   actionMessage.textContent = message;
@@ -225,19 +48,37 @@ function showActionMessage(message, duration = 1800) {
   }
 }
 
-function isTwitterInAppBrowser() {
-  return /Twitter/i.test(navigator.userAgent);
-}
-
-function showSwitchBrowserMessage() {
-  const message = "X may block downloads here. Open this page in Safari or Chrome to save your file.";
-  showDownloadError(message);
-  status.textContent = message;
-  showActionMessage(message, 0);
-}
-
-function cleanMessage() {
-  return messageInput.value.trim();
+function selectStamp(id, announce = true) {
+  if (!Object.hasOwn(MEMES, id) || id === selectedStamp || media.rendering) return;
+  if (messageInput.value === getStamp().defaultText || !normalizeText(messageInput.value)) {
+    messageInput.value = getMeme(id).defaultText;
+  }
+  selectedStamp = id;
+  const stamp = getMeme(id);
+  for (const [video, sources] of [[previewVideo, stamp.preview], [exportVideo, stamp.export]]) {
+    video.pause();
+    video.replaceChildren(...sources.map(([src, type]) => {
+      const source = document.createElement("source");
+      source.src = src;
+      source.type = type;
+      return source;
+    }));
+    video.load();
+  }
+  media.resetSource();
+  stage.dataset.stamp = id;
+  stage.setAttribute("aria-label", `${stamp.name} Video Preview`);
+  stampButtons.forEach((button) => {
+    const selected = button.dataset.stamp === id;
+    button.classList.toggle("is-selected", selected);
+    button.setAttribute("aria-pressed", String(selected));
+  });
+  downloads.setMeme(stamp);
+  updateStageRatio();
+  setTextSide("right", false);
+  updateLivePreview();
+  media.playPreview();
+  if (announce) showActionMessage(`${stamp.name} stamp selected`);
 }
 
 function restartTextAnimation() {
@@ -270,7 +111,7 @@ function setTextSide(side, animate = true) {
   positionPreviewText(animate);
 }
 
-function measureCharacterBounds(video = rendering ? exportVideo : hamsterVideo) {
+function measureCharacterBounds(video = media.rendering ? exportVideo : previewVideo) {
   if (!video.videoWidth || !video.videoHeight) return null;
   analysisContext.clearRect(0, 0, analysisCanvas.width, analysisCanvas.height);
   analysisContext.drawImage(video, 0, 0, analysisCanvas.width, analysisCanvas.height);
@@ -292,14 +133,17 @@ function measureCharacterBounds(video = rendering ? exportVideo : hamsterVideo) 
 
   const samples = (analysisCanvas.width / 2) * (analysisCanvas.height / 2);
   if (maxX < 0 || occupied > samples * 0.94) return null;
+  const widthFraction = Math.min(1, (video.videoWidth / video.videoHeight) / FRAME_ASPECT_RATIO) * getStamp().scale;
+  const inset = getStamp().anchor === "bottom-left" ? 0 : (1 - widthFraction) / 2;
   return {
-    left: minX / analysisCanvas.width,
-    right: (maxX + 1) / analysisCanvas.width
+    left: inset + minX / analysisCanvas.width * widthFraction,
+    right: inset + (maxX + 1) / analysisCanvas.width * widthFraction
   };
 }
 
 function sideOppositeCharacter() {
-  const video = rendering ? exportVideo : hamsterVideo;
+  if (getStamp().anchor === "bottom-left") return "right";
+  const video = media.rendering ? exportVideo : previewVideo;
   const bounds = measureCharacterBounds(video);
   if (bounds) {
     const leftSpace = bounds.left;
@@ -312,73 +156,14 @@ function sideOppositeCharacter() {
   }
 
   const duration = Number.isFinite(video.duration) && video.duration > 0 ? video.duration : 9;
-  const phase = ((video.currentTime - CLEAN_VIDEO_START) % duration) / duration;
+  const phase = ((video.currentTime) % duration) / duration;
   return phase < 0.32 || phase >= 0.72 ? "right" : "left";
 }
 
 function syncTextToCharacter() {
-  if (!hamsterVideo.duration) return;
+  if (!previewVideo.duration) return;
   const nextSide = sideOppositeCharacter();
   if (nextSide !== textSide) setTextSide(nextSide);
-}
-
-function updateLivePreview() {
-  layoutPreviewText();
-  textMeasure.textContent = messageInput.value || "";
-  messageInput.style.height = "auto";
-  messageInput.style.height = `${Math.min(320, Math.max(118, messageInput.scrollHeight))}px`;
-  textMeasure.style.height = messageInput.style.height;
-  restartTextAnimation();
-  messageVersion += 1;
-  shareButton.disabled = false;
-
-  if (renderedUrl) {
-    URL.revokeObjectURL(renderedUrl);
-    renderedUrl = "";
-    renderedBlob = undefined;
-    downloadButton.href = "#";
-  }
-  if (renderedGifUrl) {
-    URL.revokeObjectURL(renderedGifUrl);
-    renderedGifUrl = "";
-    renderedGifBlob = undefined;
-    gifDownloadButton.href = "#";
-  }
-  downloadLabel.textContent = "Download video";
-  gifDownloadLabel.textContent = "Download GIF";
-  if (!rendering) resetDownloadState();
-  actionMessage.classList.remove("is-visible");
-  updateShareLabel();
-  if (!rendering) status.textContent = "Ready to export";
-}
-
-function playPreview() {
-  if (!editingText && !manuallyPaused && !rendering) hamsterVideo.play().catch(() => {});
-}
-
-function updatePlayButton() {
-  const paused = hamsterVideo.paused;
-  stage.classList.toggle("is-paused", paused);
-  playButton.setAttribute("aria-label", paused ? "Play Video" : "Pause Video");
-  playButton.title = paused ? "Play Video" : "Pause Video";
-  playIcon.innerHTML = paused
-    ? '<path d="m7 4.5 8 5.5-8 5.5z" />'
-    : '<path d="M6.5 4.5v11m7-11v11" />';
-}
-
-function togglePlayback() {
-  if (hamsterVideo.paused) {
-    manuallyPaused = false;
-    playPreview();
-  } else {
-    manuallyPaused = true;
-    hamsterVideo.pause();
-  }
-}
-
-function pauseWhileEditing() {
-  editingText = true;
-  hamsterVideo.pause();
 }
 
 function formatCount(value) {
@@ -398,145 +183,17 @@ function loadVisitStats() {
 }
 
 function updateStageRatio() {
-  if (!hamsterVideo.videoWidth || !hamsterVideo.videoHeight) return;
-  stage.classList.toggle("is-opaque-source", hamsterVideo.currentSrc.endsWith("hamster-fallback.mp4"));
-  stage.style.setProperty("--stage-ratio", `${hamsterVideo.videoWidth} / ${hamsterVideo.videoHeight}`);
+  const stamp = getStamp();
+  stage.dataset.mediaAnchor = stamp.anchor;
+  stage.classList.toggle("is-opaque-source", Boolean(stamp.opaqueSource && previewVideo.currentSrc && new URL(previewVideo.currentSrc).pathname === stamp.opaqueSource));
+  stage.style.setProperty("--stage-ratio", String(FRAME_ASPECT_RATIO));
+  previewVideo.style.setProperty("--video-scale", String(stamp.scale));
   requestAnimationFrame(layoutPreviewText);
-}
-
-async function prepareAudio() {
-  if (!audioContext) {
-    audioContext = new AudioContext();
-    previewMediaSource = audioContext.createMediaElementSource(hamsterVideo);
-    exportMediaSource = audioContext.createMediaElementSource(exportVideo);
-    recorderAudioDestination = audioContext.createMediaStreamDestination();
-    monitorGain = audioContext.createGain();
-    monitorGain.gain.value = soundEnabled ? 0.82 : 0;
-    exportMediaSource.connect(recorderAudioDestination);
-    previewMediaSource.connect(monitorGain);
-    monitorGain.connect(audioContext.destination);
-  }
-
-  hamsterVideo.muted = false;
-  exportVideo.muted = false;
-  if (!editingText && !manuallyPaused && !rendering) hamsterVideo.play().catch(() => {});
-  if (audioContext.state === "suspended") {
-    await audioContext.resume();
-  }
-  if (audioContext.state !== "running") throw new Error("Audio is waiting for a browser gesture");
-  soundUnlocked = true;
-  updateSoundButton();
-}
-
-function updateSoundButton() {
-  const audible = soundEnabled && soundUnlocked;
-  soundButton.setAttribute("aria-pressed", String(audible));
-  soundLabel.textContent = audible ? "Sound On" : soundEnabled ? "Tap for Sound" : "Sound Off";
-  soundIcon.classList.toggle("is-on", audible);
-  soundIcon.innerHTML = audible
-    ? '<path d="M3 8h3l4-3v10l-4-3H3zM13 7.2a4 4 0 0 1 0 5.6M15.4 5a7 7 0 0 1 0 10" />'
-    : '<path d="M3 8h3l4-3v10l-4-3H3zM14 7l3 3m0 0-3 3" />';
-  soundButton.setAttribute("aria-label", audible ? "Turn Sound Off" : "Turn Sound On");
-  soundButton.title = audible ? "Turn Sound Off" : soundEnabled ? "Tap for Sound" : "Turn Sound On";
-  stage.classList.toggle("needs-sound", soundEnabled && !soundUnlocked);
-}
-
-async function toggleSound() {
-  try {
-    if (soundEnabled && !soundUnlocked) {
-      await prepareAudio();
-      playPreview();
-    } else {
-      soundEnabled = !soundEnabled;
-      if (soundEnabled) await prepareAudio();
-      if (monitorGain) monitorGain.gain.setTargetAtTime(soundEnabled ? 0.82 : 0, audioContext.currentTime, 0.018);
-      hamsterVideo.muted = !soundEnabled;
-    }
-    updateSoundButton();
-    showActionMessage(soundEnabled ? "Sound on" : "Sound off");
-  } catch (error) {
-    console.error(error);
-    showActionMessage("Tap again for sound");
-  }
-}
-
-async function startPreviewMuted() {
-  hamsterVideo.muted = true;
-  await hamsterVideo.play().catch(() => {});
-}
-
-function wrapText(context, text, maxWidth) {
-  const lines = [];
-  for (const paragraph of text.replace(/\r\n?/g, "\n").split("\n")) {
-    const words = paragraph.trim().split(/\s+/).filter(Boolean);
-    if (!words.length) {
-      lines.push("");
-      continue;
-    }
-
-    let line = "";
-    for (const word of words) {
-      const candidate = line ? `${line} ${word}` : word;
-      if (context.measureText(candidate).width <= maxWidth) {
-        line = candidate;
-        continue;
-      }
-      if (line) {
-        lines.push(line);
-        line = "";
-      }
-      for (const character of Array.from(word)) {
-        if (line && context.measureText(line + character).width > maxWidth) {
-          lines.push(line);
-          line = "";
-        }
-        line += character;
-      }
-    }
-    lines.push(line);
-  }
-  return lines;
-}
-
-function layoutText(context, text, width, height) {
-  const key = `${width}:${height}:${text}`;
-  if (textLayoutCache.has(key)) return textLayoutCache.get(key);
-
-  const maxWidth = width * 0.52;
-  const maxHeight = Math.min(height * 0.78, height - 8);
-  const initialSize = Math.min(width * 0.103, height * 0.16);
-  let low = 0.5;
-  let high = initialSize;
-  let best = null;
-
-  for (let attempt = 0; attempt < 16; attempt += 1) {
-    const size = (low + high) / 2;
-    context.font = `700 ${size}px Georgia, "Times New Roman", serif`;
-    const lines = wrapText(context, text, maxWidth);
-    const widths = lines.map((line) => context.measureText(line).width);
-    const layout = { lines, widths, size, lineHeight: size * 0.94, width: Math.max(0, ...widths) };
-    if (layout.lineHeight * lines.length <= maxHeight && layout.width <= maxWidth) {
-      best = layout;
-      low = size;
-    } else {
-      high = size;
-    }
-  }
-
-  if (!best) {
-    context.font = `700 0.5px Georgia, "Times New Roman", serif`;
-    const lines = wrapText(context, text, maxWidth);
-    const widths = lines.map((line) => context.measureText(line).width);
-    best = { lines, widths, size: 0.5, lineHeight: 0.47, width: Math.max(0, ...widths) };
-  }
-  if (textLayoutCache.size > 12) textLayoutCache.clear();
-  textLayoutCache.set(key, best);
-  return best;
 }
 
 function layoutPreviewText() {
   if (!stage.clientWidth || !stage.clientHeight) return;
-  const layout = layoutText(previewMeasureContext, cleanMessage(), stage.clientWidth, stage.clientHeight);
+  const layout = layoutText(previewMeasureContext, getMessage(), stage.clientWidth, stage.clientHeight);
   previewText.textContent = layout.lines.join("\n");
   previewText.style.fontSize = `${layout.size}px`;
   previewText.style.lineHeight = `${layout.lineHeight}px`;
@@ -544,682 +201,36 @@ function layoutPreviewText() {
   previewText.style.top = `${stage.clientHeight / 2}px`;
   positionPreviewText(false);
 }
-
-function drawFrame(elapsedSeconds, message, canvas = exportCanvas, context = exportContext, slideEasing = 0.16) {
-  const width = canvas.width;
-  const height = canvas.height;
-  const { lines, widths, size, lineHeight } = layoutText(context, message, width, height);
-  const totalHeight = lineHeight * lines.length;
-  const startY = height * 0.5 - totalHeight * 0.5 + size * 0.78;
-
-  context.fillStyle = "#ffffff";
-  context.fillRect(0, 0, width, height);
-  const activeVideo = rendering ? exportVideo : hamsterVideo;
-  const videoEnd = activeVideo.duration || 0;
-  const sourceFrame = cleanEndFrame && activeVideo.currentTime >= videoEnd - 0.04
-    ? cleanEndFrame
-    : activeVideo;
-  const opaqueSource = activeVideo.currentSrc.endsWith("hamster-fallback.mp4");
-  const drawSource = () => {
-    context.imageSmoothingEnabled = true;
-    context.imageSmoothingQuality = "high";
-    context.drawImage(sourceFrame, -width * 0.04, -height * 0.04, width * 1.08, height * 1.08);
-  };
-  if (opaqueSource) drawSource();
-  context.textBaseline = "alphabetic";
-  context.font = `700 ${size}px Georgia, "Times New Roman", serif`;
-  context.fillStyle = "#171714";
-
-  const desiredSlide = sideOppositeCharacter() === "left" ? 1 : 0;
-  exportSlide += (desiredSlide - exportSlide) * slideEasing;
-  context.textAlign = "left";
-
-  lines.forEach((line, index) => {
-    const delay = index * 0.1;
-    const entryProgress = Math.max(0, Math.min(1, (elapsedSeconds - delay) / 0.55));
-    const entryEase = 1 - Math.pow(1 - entryProgress, 3);
-    const rightX = width * 0.95 - widths[index];
-    const leftX = width * 0.05;
-    const lineX = rightX + (leftX - rightX) * exportSlide + (1 - entryEase) * width * 0.035;
-    context.globalAlpha = entryEase;
-    context.fillText(line, lineX, startY + index * lineHeight);
-  });
-
-  context.globalAlpha = 1;
-  context.textAlign = "left";
-  if (!opaqueSource) drawSource();
+function updateLivePreview() {
+  layoutPreviewText();
+  messageInput.style.height = "auto";
+  messageInput.style.height = `${Math.min(320, Math.max(118, messageInput.scrollHeight))}px`;
+  restartTextAnimation();
+  messageVersion += 1;
+  media.invalidate();
+  if (!media.rendering) downloads.resetDownloadState();
+  actionMessage.classList.remove("is-visible");
+  sharing.updateShareLabel();
+  if (!media.rendering) status.textContent = "Ready to export";
 }
-
-function seekVideo(time, video = hamsterVideo) {
-  return new Promise((resolve) => {
-    if (Math.abs(video.currentTime - time) < 0.001) {
-      resolve();
-      return;
-    }
-    video.addEventListener("seeked", resolve, { once: true });
-    video.currentTime = time;
-  });
-}
-
-function mobileSaveNeedsTap() {
-  return navigator.maxTouchPoints > 0 && window.matchMedia("(pointer: coarse)").matches;
-}
-
-function renderedFile() {
-  return new File([renderedBlob], renderedFilename, { type: renderedBlob.type });
-}
-
-function canShareRenderedVideo() {
-  if (!mobileSaveNeedsTap() || !navigator.share || !navigator.canShare || !renderedBlob || exportVersion !== messageVersion) return false;
-  try {
-    return navigator.canShare({ files: [renderedFile()] });
-  } catch {
-    return false;
-  }
-}
-
-function updateShareLabel() {
-  const label = canShareRenderedVideo() ? "Share Video" : navigator.share && mobileSaveNeedsTap() ? "Share Link" : "Copy Link";
-  shareButton.setAttribute("aria-label", label);
-  shareButton.title = label;
-  setShareLabel(label);
-}
-
-function setShareLabel(label) {
-  if (shareLabel.textContent === label) return;
-  shareLabel.textContent = label;
-}
-
-function createRecorder(stream, videoBitsPerSecond) {
-  const choices = [
-    "video/mp4;codecs=avc1.42E01E,mp4a.40.2",
-    "video/mp4;codecs=avc1,mp4a.40.2",
-    "video/mp4",
-    "video/webm;codecs=vp8,opus",
-    "video/webm"
-  ];
-  for (const mimeType of choices) {
-    if (!MediaRecorder.isTypeSupported(mimeType)) continue;
-    try {
-      return new MediaRecorder(stream, { mimeType, videoBitsPerSecond, audioBitsPerSecond: 64_000 });
-    } catch {
-      // Some browsers report a type as supported but reject its constructor.
-    }
-  }
-  throw new Error("This browser cannot record MP4 or WebM video");
-}
-
-function waitForVideoEnd(video, duration) {
-  return new Promise((resolve, reject) => {
-    const timeout = window.setTimeout(() => finish(new Error("Video playback stalled")), Math.max(30_000, duration * 4000));
-    const onEnded = () => finish();
-    const onError = () => finish(video.error || new Error("Source video failed"));
-    function finish(error) {
-      window.clearTimeout(timeout);
-      video.removeEventListener("ended", onEnded);
-      video.removeEventListener("error", onError);
-      if (error) reject(error);
-      else resolve();
-    }
-    video.addEventListener("ended", onEnded);
-    video.addEventListener("error", onError);
-  });
-}
-
-function verifyRecording(blob, duration) {
-  if (blob.size < 30_000) return Promise.reject(new Error("Recorded video is empty"));
-  return new Promise((resolve, reject) => {
-    const probe = document.createElement("video");
-    const url = URL.createObjectURL(blob);
-    let settled = false;
-    const timeout = window.setTimeout(() => finish(new Error("Recorded video could not be opened")), 8000);
-    function finish(error) {
-      if (settled) return;
-      settled = true;
-      window.clearTimeout(timeout);
-      probe.removeAttribute("src");
-      probe.load();
-      URL.revokeObjectURL(url);
-      if (error) reject(error);
-      else resolve();
-    }
-    probe.addEventListener("loadedmetadata", () => {
-      if (Number.isFinite(probe.duration) && probe.duration < duration - 0.5) {
-        finish(new Error("Recorded video ended early"));
-      } else {
-        finish();
-      }
-    }, { once: true });
-    probe.addEventListener("error", () => finish(new Error("Recorded video is not playable")), { once: true });
-    probe.preload = "metadata";
-    probe.src = url;
-  });
-}
-
-function monitorCleanPlayback() {
-  if (!("requestVideoFrameCallback" in hamsterVideo)) return;
-  hamsterVideo.requestVideoFrameCallback(() => {
-    if (!rendering) syncTextToCharacter();
-    monitorCleanPlayback();
-  });
-}
-
-function setBusy(isBusy) {
-  rendering = isBusy;
-  if (isBusy) hamsterVideo.pause();
-  status.classList.toggle("is-busy", isBusy);
-  status.classList.remove("is-error");
-  status.textContent = isBusy ? "Loading video for export" : "Ready";
-}
-
-async function prepareExportCanvas(longEdge) {
-  exportVideo.load();
-  if (exportVideo.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) {
-    await new Promise((resolve, reject) => {
-      exportVideo.addEventListener("loadeddata", resolve, { once: true });
-      exportVideo.addEventListener("error", reject, { once: true });
-    });
-  }
-
-  const sourceWidth = exportVideo.videoWidth || 1080;
-  const sourceHeight = exportVideo.videoHeight || 1080;
-  const duration = exportVideo.duration || 9;
-  const scale = longEdge / Math.max(sourceWidth, sourceHeight);
-  exportCanvas.width = Math.max(2, Math.round(sourceWidth * scale / 2) * 2);
-  exportCanvas.height = Math.max(2, Math.round(sourceHeight * scale / 2) * 2);
-  exportSlide = 0;
-
-  exportVideo.loop = false;
-  exportVideo.pause();
-  await seekVideo(Math.max(0, duration - 0.08), exportVideo);
-  cleanEndFrame = document.createElement("canvas");
-  cleanEndFrame.width = sourceWidth;
-  cleanEndFrame.height = sourceHeight;
-  cleanEndFrame.getContext("2d", { alpha: true }).drawImage(exportVideo, 0, 0, sourceWidth, sourceHeight);
-  await seekVideo(CLEAN_VIDEO_START, exportVideo);
-  setTextSide("right", false);
-  return duration;
-}
-
-async function makeVideo(event) {
-  event?.preventDefault();
-  if (rendering) {
-    showActionMessage("Video is already rendering");
-    return;
-  }
-
-  if (!window.MediaRecorder || !exportCanvas.captureStream) {
-    status.classList.add("is-error");
-    status.textContent = "Video export is not supported in this browser.";
-    showActionMessage("Video export is not supported in this browser.", 0);
-    downloadPending = false;
-    downloadLabel.textContent = "Download video";
-    downloadButton.removeAttribute("aria-busy");
-    showDownloadError("Video export is not supported in this browser. Try GIF instead.");
-    return;
-  }
-
-  setBusy(true);
-  downloadLabel.textContent = "Preparing video…";
-  downloadButton.setAttribute("aria-busy", "true");
-  showDownloadProgress("Preparing…");
-  const renderVersion = messageVersion;
-  const message = cleanMessage();
-  let canvasStream;
-  let combinedStream;
-  let recorder;
-  let animationFrame = 0;
-
-  try {
-    await prepareAudio();
-    const mobile = mobileSaveNeedsTap();
-    const duration = await prepareExportCanvas(mobile ? MOBILE_LONG_EDGE : DESKTOP_LONG_EDGE);
-
-    canvasStream = exportCanvas.captureStream(30);
-    combinedStream = new MediaStream([
-      ...canvasStream.getVideoTracks(),
-      ...recorderAudioDestination.stream.getAudioTracks()
-    ]);
-    recorder = createRecorder(combinedStream, mobile ? 1_400_000 : 2_000_000);
-    const mimeType = recorder.mimeType || "video/webm";
-    const chunks = [];
-    let lastProgress = -10;
-
-    recorder.addEventListener("dataavailable", (chunkEvent) => {
-      if (chunkEvent.data.size) chunks.push(chunkEvent.data);
-    });
-
-    const completed = new Promise((resolve, reject) => {
-      recorder.addEventListener("stop", resolve, { once: true });
-      recorder.addEventListener("error", (event) => reject(event.error || new Error("Recording failed")), { once: true });
-    });
-    const draw = () => {
-      const elapsed = Math.max(0, exportVideo.currentTime - CLEAN_VIDEO_START);
-      drawFrame(elapsed, message, exportCanvas, exportContext);
-      const progress = Math.min(90, Math.floor(elapsed / duration * 10) * 10);
-      if (progress !== lastProgress) {
-        lastProgress = progress;
-        status.textContent = `Rendering video ${progress}%`;
-        showDownloadProgress(`Video ${progress}%`);
-      }
-      if (rendering && !exportVideo.ended) {
-        animationFrame = requestAnimationFrame(draw);
-      }
-    };
-
-    recorder.start();
-    downloadLabel.textContent = "Rendering video";
-    drawFrame(0, message, exportCanvas, exportContext);
-    await exportVideo.play();
-    draw();
-    await waitForVideoEnd(exportVideo, duration);
-    downloadLabel.textContent = "Finishing…";
-    status.textContent = "Finishing video";
-    showDownloadProgress("Finishing…");
-    exportVideo.pause();
-    cancelAnimationFrame(animationFrame);
-    // Paint one known-clean frame and let the canvas stream flush it before
-    // stopping. This removes the final-frame flash/overlay glitch.
-    drawFrame(Math.max(CLEAN_VIDEO_START, duration - 0.01), message, exportCanvas, exportContext);
-    await new Promise((resolve) => window.setTimeout(resolve, 120));
-    recorder.stop();
-    await completed;
-
-    const blob = new Blob(chunks, { type: mimeType });
-    await verifyRecording(blob, duration);
-    renderedBlob = blob;
-    renderedFilename = mimeType.startsWith("video/mp4") ? "hamster-type.mp4" : "hamster-type.webm";
-    downloadButton.download = renderedFilename;
-    exportVersion = renderVersion;
-    if (renderedUrl) URL.revokeObjectURL(renderedUrl);
-    renderedUrl = URL.createObjectURL(blob);
-    if (renderVersion === messageVersion) {
-      downloadButton.href = renderedUrl;
-      downloadButton.classList.remove("is-disabled");
-      downloadButton.setAttribute("aria-disabled", "false");
-      shareButton.disabled = false;
-      updateShareLabel();
-      status.textContent = mobile ? "Video ready. Tap Save video." : "Video ready";
-      if (downloadPending) {
-        downloadPending = false;
-        renderPending = false;
-        if (mobile) {
-          downloadLabel.textContent = "Save video";
-          downloadButton.removeAttribute("aria-busy");
-          showDownloadReady("Save video", renderedUrl, renderedFilename);
-          showActionMessage("Ready — tap Save video");
-        } else {
-          saveRenderedVideo();
-        }
-      } else {
-        downloadLabel.textContent = "Save video";
-        downloadButton.removeAttribute("aria-busy");
-        showDownloadReady("Save video", renderedUrl, renderedFilename);
-      }
-    } else {
-      renderedBlob = undefined;
-      URL.revokeObjectURL(renderedUrl);
-      renderedUrl = "";
-      downloadButton.href = "#";
-      updateShareLabel();
-      status.textContent = "Text changed—ready to export";
-      renderPending = renderPending || downloadPending;
-    }
-    status.classList.remove("is-busy");
-  } catch (error) {
-    console.error(error);
-    downloadPending = false;
-    renderPending = false;
-    downloadLabel.textContent = "Download video";
-    downloadButton.removeAttribute("aria-busy");
-    showDownloadError("Video export failed. Choose a format to try again.");
-    showActionMessage("Video export failed. Try again.", 0);
-    status.classList.remove("is-busy");
-    status.classList.add("is-error");
-    status.textContent = "Couldn’t render—try again";
-  } finally {
-    rendering = false;
-    cancelAnimationFrame(animationFrame);
-    if (recorder?.state === "recording") recorder.stop();
-    canvasStream?.getTracks().forEach((track) => track.stop());
-    combinedStream?.getVideoTracks().forEach((track) => track.stop());
-    exportVideo.pause();
-    exportVideo.currentTime = CLEAN_VIDEO_START;
-    playPreview();
-    if (renderPending) {
-      renderPending = false;
-      window.setTimeout(() => makeVideo(), 0);
-    }
-  }
-}
-
-async function makeGif() {
-  if (rendering) {
-    showActionMessage("An export is already rendering");
-    return;
-  }
-
-  setBusy(true);
-  gifDownloadLabel.textContent = "Preparing GIF…";
-  gifDownloadButton.setAttribute("aria-busy", "true");
-  showDownloadProgress("Preparing…");
-  const renderVersion = messageVersion;
-  const message = cleanMessage();
-
-  try {
-    const { GIFEncoder, quantize, applyPalette } = await import("./vendor/gifenc.esm.js");
-    const duration = await prepareExportCanvas(GIF_LONG_EDGE);
-    const frameCount = Math.max(1, Math.ceil(duration * GIF_FPS));
-    const gif = GIFEncoder();
-
-    for (let frame = 0; frame < frameCount; frame += 1) {
-      const time = Math.min(Math.max(0, duration - 0.04), frame / GIF_FPS);
-      await seekVideo(time, exportVideo);
-      drawFrame(time, message, exportCanvas, exportContext, 0.4);
-      const pixels = exportContext.getImageData(0, 0, exportCanvas.width, exportCanvas.height).data;
-      const palette = quantize(pixels, 256);
-      const indexed = applyPalette(pixels, palette);
-      gif.writeFrame(indexed, exportCanvas.width, exportCanvas.height, {
-        palette,
-        delay: 1000 / GIF_FPS,
-        repeat: 0
-      });
-      if (frame % GIF_FPS === 0) {
-        const progress = Math.round(frame / frameCount * 100);
-        status.textContent = `Rendering GIF ${progress}%`;
-        gifDownloadLabel.textContent = `GIF ${progress}%`;
-        showDownloadProgress(`GIF ${progress}%`);
-        await new Promise((resolve) => window.setTimeout(resolve, 0));
-      }
-    }
-
-    showDownloadProgress("Finishing…");
-    gif.finish();
-    const bytes = gif.bytes();
-    if (bytes.length < 100) throw new Error("GIF export is empty");
-    const blob = new Blob([bytes], { type: "image/gif" });
-    if (renderVersion === messageVersion) {
-      if (renderedGifUrl) URL.revokeObjectURL(renderedGifUrl);
-      renderedGifBlob = blob;
-      renderedGifUrl = URL.createObjectURL(blob);
-      gifVersion = renderVersion;
-      gifDownloadButton.href = renderedGifUrl;
-      gifDownloadLabel.textContent = mobileSaveNeedsTap() ? "Save GIF" : "GIF";
-      status.textContent = mobileSaveNeedsTap() ? "GIF ready. Tap Save GIF." : "GIF ready";
-      gifDownloadButton.removeAttribute("aria-busy");
-      if (gifDownloadPending) {
-        gifDownloadPending = false;
-        if (mobileSaveNeedsTap()) {
-          showDownloadReady("Save GIF", renderedGifUrl, "hamster-type.gif");
-          showActionMessage("Ready — tap Save GIF");
-        } else saveRenderedFile(renderedGifUrl, "hamster-type.gif");
-      } else {
-        showDownloadReady("Save GIF", renderedGifUrl, "hamster-type.gif");
-      }
-    } else {
-      gifDownloadPending = false;
-      gifDownloadLabel.textContent = "Download GIF";
-      gifDownloadButton.removeAttribute("aria-busy");
-      status.textContent = "Text changed — ready to export";
-      resetDownloadState();
-    }
-    status.classList.remove("is-busy");
-  } catch (error) {
-    console.error(error);
-    gifDownloadPending = false;
-    gifDownloadLabel.textContent = "Download GIF";
-    gifDownloadButton.removeAttribute("aria-busy");
-    showDownloadError("GIF export failed. Choose a format to try again.");
-    showActionMessage("GIF export failed. Try again.", 0);
-    status.classList.remove("is-busy");
-    status.classList.add("is-error");
-    status.textContent = "Couldn’t render GIF — try again";
-  } finally {
-    rendering = false;
-    exportVideo.pause();
-    exportVideo.currentTime = CLEAN_VIDEO_START;
-    playPreview();
-  }
-}
-
-function downloadVideo(event) {
-  if (!emailAccepted) {
-    event.preventDefault();
-    resetDownloadState();
-    openDownloadDialog();
-    return;
-  }
-  if (isTwitterInAppBrowser()) {
-    event.preventDefault();
-    showSwitchBrowserMessage();
-    return;
-  }
-  if (rendering) {
-    event.preventDefault();
-    showActionMessage("Video is already rendering");
-    return;
-  }
-  if (!renderedBlob || exportVersion !== messageVersion) {
-    event.preventDefault();
-    downloadPending = true;
-    downloadLabel.textContent = "Preparing video";
-    downloadButton.setAttribute("aria-busy", "true");
-    showDownloadProgress("Preparing…");
-    makeVideo();
-    return;
-  }
-
-  // Keep the browser's native anchor action inside this tap. Mobile browsers
-  // may ignore a synthetic click made after an asynchronous render.
-  status.textContent = "Download requested";
-  showActionMessage("Download requested. Check your browser's downloads.");
-  window.setTimeout(() => showDownloadSaving("Save video", renderedUrl, renderedFilename), 0);
-}
-
-function saveRenderedVideo() {
-  saveRenderedFile(renderedUrl, renderedFilename);
-}
-
-function downloadGif(event) {
-  if (!emailAccepted) {
-    event.preventDefault();
-    resetDownloadState();
-    openDownloadDialog();
-    return;
-  }
-  if (isTwitterInAppBrowser()) {
-    event.preventDefault();
-    showSwitchBrowserMessage();
-    return;
-  }
-  if (rendering) {
-    event.preventDefault();
-    showActionMessage("An export is already rendering");
-    return;
-  }
-  if (!renderedGifBlob || gifVersion !== messageVersion) {
-    event.preventDefault();
-    gifDownloadPending = true;
-    makeGif();
-    return;
-  }
-  status.textContent = "Download requested";
-  showActionMessage("Download requested. Check your browser's downloads.");
-  window.setTimeout(() => showDownloadSaving("Save GIF", renderedGifUrl, "hamster-type.gif"), 0);
-}
-
-function saveRenderedFile(url, filename) {
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = filename;
-  link.rel = "noopener";
-  document.body.append(link);
-  link.click();
-  link.remove();
-  showDownloadSaving(filename.endsWith(".gif") ? "Save GIF" : "Save video", url, filename);
-  status.textContent = "Download requested";
-  showActionMessage("Download requested. Check your browser's downloads.");
-}
-
-async function shareVideo() {
-  const shareUrl = new URL("/", location.origin);
-  shareUrl.searchParams.set("text", messageInput.value.trim().slice(0, 120));
-  shareUrl.searchParams.delete("name");
-  const linkText = shareUrl.href;
-
-  try {
-    if (navigator.share && mobileSaveNeedsTap()) {
-      try {
-        const fileShare = canShareRenderedVideo();
-        await navigator.share(fileShare
-          ? { title: "Baby Boo video", files: [renderedFile()] }
-          : { title: "Baby Boo video", url: linkText });
-        status.textContent = fileShare ? "Video shared" : "Link shared";
-        showActionMessage(fileShare ? "Video shared" : "Link shared");
-        return;
-      } catch (error) {
-        if (error.name === "AbortError") return;
-        // Use the copy flow when native sharing is unavailable.
-      }
-    }
-    let copied = false;
-    if (navigator.clipboard?.writeText) {
-      try {
-        await navigator.clipboard.writeText(linkText);
-        copied = true;
-      } catch {
-        // Clipboard access can exist but still be denied on insecure origins.
-      }
-    }
-    if (!copied) {
-      const helper = document.createElement("textarea");
-      helper.value = linkText;
-      helper.setAttribute("readonly", "");
-      helper.style.position = "fixed";
-      helper.style.opacity = "0";
-      document.body.append(helper);
-      helper.select();
-      copied = document.execCommand("copy");
-      helper.remove();
-    }
-    if (!copied) throw new Error("Clipboard copy was denied");
-    status.textContent = "Link copied";
-    showActionMessage("Link copied");
-    setShareLabel("Copied");
-    shareIcon.innerHTML = '<path d="m5 10 3.2 3.2L15.5 6" />';
-    window.clearTimeout(shareResetTimer);
-    shareResetTimer = window.setTimeout(() => {
-      updateShareLabel();
-      shareIcon.innerHTML = '<rect x="7" y="6" width="10" height="11" rx="1.5" /><path d="M13 6V4.5A1.5 1.5 0 0 0 11.5 3h-7A1.5 1.5 0 0 0 3 4.5v8A1.5 1.5 0 0 0 4.5 14H7" />';
-    }, 1600);
-  } catch (error) {
-    console.error(error);
-    status.textContent = "Copy the link from the address bar";
-    showActionMessage("Copy failed");
-  }
-}
-
-messageInput.addEventListener("input", () => {
-  updateLivePreview();
-  pauseWhileEditing();
-});
-messageInput.addEventListener("focus", pauseWhileEditing);
-messageInput.addEventListener("blur", () => {
-  editingText = false;
-  window.setTimeout(playPreview, 0);
-});
-hamsterVideo.addEventListener("loadedmetadata", updateStageRatio);
-hamsterVideo.addEventListener("play", updatePlayButton);
-hamsterVideo.addEventListener("pause", updatePlayButton);
-hamsterVideo.addEventListener("timeupdate", syncTextToCharacter);
-hamsterVideo.addEventListener("seeked", syncTextToCharacter);
+messageInput.addEventListener("input", () => { updateLivePreview(); media.pauseWhileEditing(); });
+messageInput.addEventListener("focus", media.pauseWhileEditing);
+messageInput.addEventListener("blur", media.resumeAfterEditing);
+previewVideo.addEventListener("loadedmetadata", updateStageRatio);
+previewVideo.addEventListener("timeupdate", syncTextToCharacter);
+previewVideo.addEventListener("seeked", syncTextToCharacter);
 window.addEventListener("resize", layoutPreviewText);
-// If audible playback is requested, unlock it on the next gesture.
-// The speaker button handles its own gesture.
-const unlockAudio = (event) => {
-  if (event.target.closest?.("#sound-button") || !soundEnabled || soundUnlocked) return;
-  prepareAudio().then(playPreview).catch(console.error);
-};
-document.addEventListener("pointerdown", unlockAudio, { capture: true });
-document.addEventListener("keydown", unlockAudio, { capture: true });
-soundButton.addEventListener("click", (event) => {
-  event.stopPropagation();
-  toggleSound();
-});
-playButton.addEventListener("click", (event) => {
-  event.stopPropagation();
-  togglePlayback();
-});
-stage.addEventListener("click", (event) => {
-  if (!event.target.closest(".stage-controls")) togglePlayback();
-});
-shareButton.addEventListener("click", shareVideo);
-characterStamp.addEventListener("click", () => {
-  characterStamp.classList.add("is-selected");
-  characterStamp.setAttribute("aria-pressed", "true");
-  showActionMessage("Hamster character selected");
-});
-downloadButton.addEventListener("click", downloadVideo);
-gifDownloadButton.addEventListener("click", downloadGif);
-downloadToggle.addEventListener("click", openDownloadDialog);
-emailForm.addEventListener("submit", submitDownloadEmail);
-emailInput.addEventListener("input", () => {
-  emailInput.removeAttribute("aria-invalid");
-  emailError.hidden = true;
-  if (!emailSubmitting) emailContinue.textContent = "Continue to download";
-});
-document.querySelector("#download-close").addEventListener("click", () => downloadDialog.close());
-downloadDialog.addEventListener("keydown", (event) => {
-  if (event.key !== "Tab") return;
-  const controls = [...downloadDialog.querySelectorAll('button:not(:disabled), a[href], input:not(:disabled)')]
-    .filter((control) => control.getClientRects().length > 0);
-  const first = controls[0];
-  const last = controls.at(-1);
-  const active = document.activeElement;
-  if (event.shiftKey && (active === first || !controls.includes(active))) {
-    event.preventDefault();
-    last?.focus();
-  } else if (!event.shiftKey && (active === last || !controls.includes(active))) {
-    event.preventDefault();
-    first?.focus();
-  }
-});
-let backdropPointerDown = false;
-downloadDialog.addEventListener("pointerdown", (event) => {
-  const bounds = downloadDialog.getBoundingClientRect();
-  backdropPointerDown = event.clientX < bounds.left || event.clientX > bounds.right || event.clientY < bounds.top || event.clientY > bounds.bottom;
-});
-downloadDialog.addEventListener("click", (event) => {
-  const bounds = downloadDialog.getBoundingClientRect();
-  const outside = event.clientX < bounds.left || event.clientX > bounds.right || event.clientY < bounds.top || event.clientY > bounds.bottom;
-  if (backdropPointerDown && outside) downloadDialog.close();
-  backdropPointerDown = false;
-});
-downloadDialog.addEventListener("close", () => {
-  document.body.classList.remove("download-dialog-open");
-  downloadToggle.focus({ preventScroll: true });
-});
-downloadAnother.addEventListener("click", () => {
-  downloadLabel.textContent = "Download video";
-  gifDownloadLabel.textContent = "Download GIF";
-  resetDownloadState();
-});
-downloadSave.addEventListener("click", () => {
-  status.textContent = "Download requested";
-  downloadResultMessage.textContent = "Download requested. Check your browser’s downloads.";
-});
-window.visualViewport?.addEventListener("resize", updateDownloadViewport);
-window.visualViewport?.addEventListener("scroll", updateDownloadViewport);
-window.addEventListener("resize", updateDownloadViewport);
+stampButtons.forEach((button) => button.addEventListener("click", () => selectStamp(button.dataset.stamp)));
 form.addEventListener("submit", (event) => event.preventDefault());
-
-const sharedText = new URLSearchParams(location.search).get("text");
-if (sharedText) messageInput.value = sharedText.slice(0, 120);
+const initial = readMemeUrl(new URL(location.href));
+selectStamp(initial.meme.id, false);
+messageInput.value = initial.message;
+messageInput.maxLength = MAX_TEXT_LENGTH;
 updateLivePreview();
 updateStageRatio();
-updatePlayButton();
-updateSoundButton();
-updateShareLabel();
-startPreviewMuted();
-monitorCleanPlayback();
+media.updatePlayButton();
+media.updateSoundButton();
+sharing.updateShareLabel();
+media.startPreviewMuted();
+media.monitorCleanPlayback();
 loadVisitStats();

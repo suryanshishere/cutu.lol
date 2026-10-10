@@ -2,11 +2,14 @@ import { createReadStream, existsSync, readFileSync, statSync } from "node:fs";
 import { createServer } from "node:http";
 import { extname, resolve, sep } from "node:path";
 import { Resvg } from "@cf-wasm/resvg/node";
-import { applyShareMeta, renderShareCard, shareText } from "./src/share-card.js";
+import { renderShareCard } from "./src/share-card.js";
+import { applyPageMeta } from "./src/page-meta.js";
+import { readMemeUrl } from "./site/memes.js";
 import { handleEmailIntake } from "./src/email-intake.js";
 import { createLocalEmailStore } from "./src/local-email-store.js";
 import { readFile } from "node:fs/promises";
-import { adminPageHeaders, adminResponse, createMemoryAdminStore, dashboardPage, handleAdminRequest, readAdminBody } from "./src/admin.js";
+import { adminPageHeaders, createMemoryAdminStore, dashboardPage, handleAdminRequest } from "./src/admin.js";
+import { createMemoryDownloadStore, handleDownloadEvent } from "./src/download-events.js";
 
 try { process.loadEnvFile(); } catch (error) { if (error.code !== "ENOENT") throw error; }
 
@@ -14,15 +17,18 @@ const port = Number(process.env.PORT || 4173);
 const root = resolve("site");
 const saveEmail = createLocalEmailStore(resolve(".local-data", "emails.json"));
 const adminStore = createMemoryAdminStore();
-const localDownloads = { video: 0, gif: 0 };
-const localDownloadEvents = new Map();
+const downloadStore = createMemoryDownloadStore();
 async function readLocalDashboard(offset) {
   let emails;
   try { emails = JSON.parse(await readFile(resolve(".local-data", "emails.json"), "utf8")); }
   catch (error) { if (error.code !== "ENOENT") throw error; emails = []; }
-  return { ...dashboardPage(emails, { today: null, total: null }, offset), downloads: localDownloads };
+  return { ...dashboardPage(emails, { today: null, total: null }, offset), downloads: downloadStore.readCounts() };
 }
-const shareStamp = readFileSync(resolve(root, "share-stamp.png"));
+const cardStamps = new Map();
+function loadCardStamp(meme) {
+  if (!cardStamps.has(meme.id)) cardStamps.set(meme.id, readFileSync(resolve(root, meme.shareImage.slice(1))));
+  return cardStamps.get(meme.id);
+}
 const shareFont = readFileSync(resolve(root, "share-lora.woff2"));
 const contentTypes = {
   ".html": "text/html; charset=utf-8",
@@ -32,11 +38,12 @@ const contentTypes = {
   ".mp4": "video/mp4",
   ".svg": "image/svg+xml",
   ".png": "image/png",
+  ".woff2": "font/woff2",
   ".txt": "text/plain; charset=utf-8",
   ".xml": "application/xml; charset=utf-8"
 };
 
-createServer(async (request, response) => {
+const server = createServer(async (request, response) => {
   let pathname;
   let url;
   try {
@@ -56,21 +63,7 @@ createServer(async (request, response) => {
       });
       let result;
       if (pathname.startsWith("/api/admin/")) result = await handleAdminRequest(apiRequest, process.env, adminStore, readLocalDashboard);
-      else if (request.method !== "POST") result = adminResponse({ error: "Method not allowed." }, 405);
-      else if (headers.get("Origin") !== url.origin) result = adminResponse({ error: "Invalid origin." }, 403);
-      else {
-        const parsed = await readAdminBody(apiRequest);
-        if (parsed.error) result = parsed.error;
-        else {
-          const { format, id } = parsed.value;
-          if (!["video", "gif"].includes(format) || typeof id !== "string" || !/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i.test(id)) result = adminResponse({ error: "Invalid download event." }, 400);
-          else {
-            for (const [key, time] of localDownloadEvents) if (time < Date.now() - 86400000) localDownloadEvents.delete(key);
-            if (!localDownloadEvents.has(id)) { localDownloads[format] += 1; localDownloadEvents.set(id, Date.now()); }
-            result = adminResponse({ ok: true });
-          }
-        }
-      }
+      else result = await handleDownloadEvent(apiRequest, downloadStore.recordEvent);
       response.writeHead(result.status, Object.fromEntries(result.headers));
       response.end(await result.text());
     } catch {
@@ -101,7 +94,8 @@ createServer(async (request, response) => {
       return;
     }
     try {
-      const png = await renderShareCard(shareText(url.searchParams.get("text")), shareStamp, shareFont, Resvg);
+      const { meme, message } = readMemeUrl(url);
+      const png = await renderShareCard(message, loadCardStamp(meme), shareFont, Resvg, meme.id);
       response.writeHead(200, { "Content-Type": "image/png", "Content-Length": png.length, "Cache-Control": "public, max-age=86400", "X-Content-Type-Options": "nosniff" });
       response.end(png);
     } catch (error) {
@@ -125,7 +119,7 @@ createServer(async (request, response) => {
   const type = contentTypes[extname(filePath).toLowerCase()] || "application/octet-stream";
   if (type.startsWith("text/html")) {
     const source = readFileSync(filePath, "utf8");
-    const html = isAdminPage ? source : applyShareMeta(source, url);
+    const html = isAdminPage ? source : applyPageMeta(source, url, url.hostname === "cutu.suryansh.lol" ? "https://cutu.suryansh.lol" : url.origin);
     response.writeHead(200, { "Content-Type": type, "Content-Length": Buffer.byteLength(html), "Cache-Control": "no-cache", ...(isAdminPage ? adminPageHeaders() : {}) });
     response.end(request.method === "HEAD" ? undefined : html);
     return;
@@ -158,5 +152,5 @@ createServer(async (request, response) => {
   });
   createReadStream(filePath).pipe(response);
 }).listen(port, "127.0.0.1", () => {
-  console.log(`Hamster Type is running at http://127.0.0.1:${port}`);
+  console.log(`cutu is running at http://127.0.0.1:${server.address().port}`);
 });

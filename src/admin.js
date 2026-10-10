@@ -1,3 +1,5 @@
+import { readJsonBody } from "./json-body.js";
+
 const SESSION_SECONDS = 8 * 60 * 60;
 const LOGIN_WINDOW_MS = 15 * 60 * 1000;
 const MAX_LOGIN_ATTEMPTS = 8;
@@ -12,31 +14,15 @@ export function adminResponse(body, status = 200, headers = {}) {
 }
 
 export async function readAdminBody(request) {
-  if (request.headers.get("Content-Type")?.split(";")[0].trim().toLowerCase() !== "application/json") {
-    return { error: adminResponse({ error: "Send JSON." }, 415) };
+  const parsed = await readJsonBody(request, { maxBytes: 2048, emptyValue: {} });
+  if (parsed.status) {
+    const messages = { 415: "Send JSON.", 413: "Request too large.", 400: "Invalid request." };
+    return { error: adminResponse({ error: messages[parsed.status] }, parsed.status) };
   }
-  if (Number(request.headers.get("Content-Length")) > 2048) return { error: adminResponse({ error: "Request too large." }, 413) };
-  try {
-    const reader = request.body?.getReader();
-    if (!reader) return { value: {} };
-    const chunks = [];
-    let size = 0;
-    try {
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        size += value.byteLength;
-        if (size > 2048) return { error: adminResponse({ error: "Request too large." }, 413) };
-        chunks.push(value);
-      }
-    } finally { reader.releaseLock(); }
-    const bytes = new Uint8Array(size);
-    let offset = 0;
-    for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.byteLength; }
-    const value = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes));
-    if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("Invalid JSON");
-    return { value };
-  } catch { return { error: adminResponse({ error: "Invalid request." }, 400) }; }
+  if (!parsed.value || typeof parsed.value !== "object" || Array.isArray(parsed.value)) {
+    return { error: adminResponse({ error: "Invalid request." }, 400) };
+  }
+  return parsed;
 }
 
 function hex(bytes) { return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join(""); }

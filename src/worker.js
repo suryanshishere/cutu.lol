@@ -1,5 +1,7 @@
 import { Resvg } from "@cf-wasm/resvg/workerd";
-import { applyShareMeta, renderShareCard, shareText } from "./share-card.js";
+import { renderShareCard } from "./share-card.js";
+import { applyPageMeta } from "./page-meta.js";
+import { readMemeUrl } from "../site/memes.js";
 import { handleEmailIntake } from "./email-intake.js";
 import { adminPageHeaders, adminResponse, readAdminBody } from "./admin.js";
 export { EmailIntake } from "./email-intake.js";
@@ -129,19 +131,20 @@ export default {
         "X-Content-Type-Options": "nosniff"
       };
       if (request.method === "HEAD") return new Response(null, { headers });
+      const { meme, message } = readMemeUrl(url);
       const [stampResponse, fontResponse] = await Promise.all([
-        env.ASSETS.fetch(new URL("/share-stamp.png", url)),
+        env.ASSETS.fetch(new URL(meme.shareImage, url)),
         env.ASSETS.fetch(new URL("/share-lora.woff2", url))
       ]);
       if (!stampResponse.ok || !fontResponse.ok) return new Response("Share card assets unavailable", { status: 503 });
       const [stamp, font] = await Promise.all([stampResponse.arrayBuffer(), fontResponse.arrayBuffer()]);
-      const png = await renderShareCard(shareText(url.searchParams.get("text")), new Uint8Array(stamp), new Uint8Array(font), Resvg);
+      const png = await renderShareCard(message, new Uint8Array(stamp), new Uint8Array(font), Resvg, meme.id);
       return new Response(png, { headers });
     }
 
-    const isPageLoad = request.method === "GET" && (url.pathname === "/" || url.pathname === "/index.html");
+    const isPageLoad = ["GET", "HEAD"].includes(request.method) && (url.pathname === "/" || url.pathname === "/index.html");
     if (isPageLoad) {
-      const assetResponse = await env.ASSETS.fetch(request);
+      const assetResponse = await env.ASSETS.fetch(new Request(new URL("/", url)));
       if (!assetResponse.ok || !assetResponse.headers.get("content-type")?.includes("text/html")) {
         return assetResponse;
       }
@@ -150,7 +153,7 @@ export default {
       const visitorId = existingVisitorId || crypto.randomUUID();
       const id = env.VISIT_COUNTER.idFromName(SITE_COUNTER_NAME);
       const counter = env.VISIT_COUNTER.get(id);
-      const countResponse = await counter.fetch("https://visit-counter/", { method: "POST", body: visitorId });
+      const countResponse = await counter.fetch("https://visit-counter/", request.method === "HEAD" ? { method: "GET" } : { method: "POST", body: visitorId });
       const counts = await countResponse.json();
 
       const html = await assetResponse.text();
@@ -159,11 +162,11 @@ export default {
       headers.delete("content-length");
       headers.delete("etag");
       headers.set("Cache-Control", "no-store");
-      if (!existingVisitorId) {
+      if (!existingVisitorId && request.method !== "HEAD") {
         headers.append("Set-Cookie", `${VISITOR_COOKIE}=${visitorId}; Path=/; Max-Age=31536000; SameSite=Lax; HttpOnly${url.protocol === "https:" ? "; Secure" : ""}`);
       }
       const publicOrigin = url.hostname === "cutu.suryansh.lol" ? "https://cutu.suryansh.lol" : url.origin;
-      return new Response(applyShareMeta(html, url, publicOrigin).replace("</head>", `${stats}</head>`), {
+      return new Response(request.method === "HEAD" ? null : applyPageMeta(html, url, publicOrigin).replace("</head>", `${stats}</head>`), {
         status: assetResponse.status,
         statusText: assetResponse.statusText,
         headers
