@@ -6,6 +6,14 @@ Choose **Baby Boo** or **Speed** using the stamps beneath the preview. Speed use
 
 Copied links include the text in a generated 1200 × 630 PNG preview card. The server adds matching Open Graph and Twitter metadata to each shared URL so messaging and social platforms can display the card. Cards use the selected meme?s postage-stamp artwork and the bundled Lora font (see `site/share-font-LICENSE.txt`). Speed?s stamp matches Baby Boo?s aged-paper, engraved-ink style.
 
+### Text appearance
+
+Type content in the existing text box. Its integrated controls offer Classic, Bold sans, Handwritten, and Typewriter fonts, left/center/right/justified alignment, a size slider, and Reset. The preview only supports moving the text: drag with a mouse or one finger, or focus the text and use arrow keys (Shift moves ten pixels). Center guides appear while dragging. Scrolling outside the text works normally on mobile.
+
+Text follows the character automatically until it is moved. Baby Boo shows a **Text motion** checkbox, checked by default: uncheck it to freeze the current position, or check it to restore automatic movement. Templates without text motion, such as Speed, hide this option. Dragging fixes placement and unchecks Text motion; Reset restores automatic placement and the default appearance without clearing the message. Font, size, and alignment changes preserve placement. These settings survive template switches and copied links, and apply equally to video and GIF exports. Appearance controls are disabled during export. The existing character layering and postage-stamp share cards are retained.
+
+Appearance URLs optionally include `font`, `scale`, `align`, and paired normalized `x`/`y` coordinates. Default values are omitted, and older links remain compatible. Text defaults to 90% of the template's auto-fit size across both templates; Reset restores that size. Size is adjustable from 50–200%, capped to keep it within a 5% frame margin. Explicit sizes in shared links are retained. The three additional fonts are self-hosted with licenses in `site/fonts/`.
+
 ## Run
 
 ```powershell

@@ -51,6 +51,8 @@ test("homepage is general and share metadata matches each selected meme", () => 
     assert.ok(html.includes("<title>cutu</title>"));
     assert.ok(html.includes(`data-stamp="${stamp}" aria-label="${MEMES[stamp].name} Video Preview"`));
     assert.ok(html.includes(`src="${MEMES[stamp].preview[0][0]}"`));
+    const motionLabel = html.match(/<label id="text-motion-option"[^>]*>/)[0];
+    assert.equal(motionLabel.includes(" hidden"), stamp === "speed");
     const graph = JSON.parse(html.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/)[1])["@graph"];
     assert.equal(graph[1].name, "cutu Personalized Meme Maker");
     assert.equal(graph[2].name, meta.title);

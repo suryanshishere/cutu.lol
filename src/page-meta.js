@@ -6,12 +6,12 @@ export function escapeMarkup(value) {
 }
 
 export function pageMetadata(url, origin = url.origin) {
-  const { meme, text, message } = readMemeUrl(url);
+  const { meme, text, message, appearance } = readMemeUrl(url);
   const personalized = Boolean(text || url.searchParams.has("stamp"));
   const title = personalized ? (text ? `A ${meme.name} message for you | cutu` : `${meme.name} Meme Maker | cutu`) : SITE_TITLE;
   const description = personalized ? text || meme.description : SITE_DESCRIPTION;
   const canonical = new URL("/", origin).href;
-  const shareUrl = createShareUrl(origin, meme.id, text).href;
+  const shareUrl = createShareUrl(origin, meme.id, text, appearance).href;
   const image = createCardUrl(origin, meme.id, text).href;
   const alt = `${meme.name} postage stamp with the message: ${message}`;
   const structuredData = {
@@ -44,13 +44,15 @@ export function applyPageMeta(html, url, origin = url.origin) {
     const pattern = new RegExp(`<meta ${kind}="${key.replaceAll(".", "\\.")}" content="[^"]*"\\s*\\/>`);
     html = html.replace(pattern, () => `<meta ${kind}="${key}" content="${escapeMarkup(value)}" />`);
   }
-  const { meme, message } = readMemeUrl(url);
+  const { meme, message, appearance } = readMemeUrl(url);
   const sources = (items) => items.map(([src, type]) => `<source src="${escapeMarkup(src)}" type="${escapeMarkup(type)}" />`).join("");
   const picker = Object.values(MEMES).map((item) => {
     const selected = item.id === meme.id;
     return `<button class="character-stamp${selected ? " is-selected" : ""}" data-stamp="${item.id}" type="button" aria-label="${item.name}" title="${item.name}" aria-pressed="${selected}"><img src="${escapeMarkup(item.image)}" alt="" /></button>`;
   }).join("\n");
   html = html.replace(/(<textarea\b[^>]*>)[\s\S]*?(<\/textarea>)/, (_, start, end) => `${start}${escapeMarkup(message)}${end}`)
+    .replace(/<label id="text-motion-option"([^>]*)>/, (_, attributes) => `<label id="text-motion-option"${attributes.replace(/\s+hidden(?:="")?/g, "")}${meme.hasTextMotion ? "" : " hidden"}>`)
+    .replace(/<input id="text-motion"[^>]*\/>/, () => `<input id="text-motion" type="checkbox"${appearance.position ? "" : " checked"} />`)
     .replace(/<button id="sound-button"([^>]*)>/, (_, attributes) => `<button id="sound-button"${attributes.replace(/\s+hidden(?:="")?/g, "")}${meme.hasAudio ? "" : " hidden"}>`)
     .replace(/(<div class="stamp-picker"[^>]*>)[\s\S]*?(<\/div>)/, (_, start, end) => `${start}${picker}${end}`)
     .replace(/(<video\s+id="meme-video"[\s\S]*?>)[\s\S]*?(<\/video>)/, (_, start, end) => `${start}${sources(meme.preview)}${end}`)

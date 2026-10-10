@@ -1,11 +1,12 @@
-import { layoutText } from "./text-layout.js";
+import { layoutText, placeText, textLineX, textRuns } from "./text-layout.js";
+import { loadTextFont, normalizeAppearance } from "./text-appearance.js";
 import { FRAME_ASPECT_RATIO } from "./memes.js";
 
 export function mobileSaveNeedsTap() {
   return navigator.maxTouchPoints > 0 && window.matchMedia("(pointer: coarse)").matches;
 }
 
-export function createMediaController({ getStamp, getMessage, getMessageVersion, sideOppositeCharacter, setTextSide, syncTextToCharacter, showActionMessage, downloads, onExportChanged }) {
+export function createMediaController({ getStamp, getMessage, getAppearance, getMessageVersion, sideOppositeCharacter, setTextSide, syncTextToCharacter, showActionMessage, downloads, onExportChanged, onBusyChanged }) {
   const previewVideo = document.querySelector("#meme-video");
   const exportVideo = document.querySelector("#export-video");
   const stage = document.querySelector("#stage");
@@ -50,10 +51,12 @@ export function createMediaController({ getStamp, getMessage, getMessageVersion,
   let cleanEndFrame;
   let editingText = false;
   let manuallyPaused = false;
+  let editingAppearance = false;
+  let exportAppearance;
   const { resetDownloadState, showDownloadProgress, showDownloadReady,
     showDownloadSaving, showDownloadError, openDownloadDialog } = downloads;
   function playPreview() {
-    if (!editingText && !manuallyPaused && !rendering) previewVideo.play().catch(() => {});
+    if (!editingText && !editingAppearance && !manuallyPaused && !rendering) previewVideo.play().catch(() => {});
   }
 
   function updatePlayButton() {
@@ -81,6 +84,16 @@ export function createMediaController({ getStamp, getMessage, getMessageVersion,
     previewVideo.pause();
   }
 
+  function beginTextGesture() {
+    const wasPlaying = !previewVideo.paused;
+    editingAppearance = true;
+    previewVideo.pause();
+    return () => {
+      editingAppearance = false;
+      if (wasPlaying) playPreview();
+    };
+  }
+
   async function prepareAudio() {
     if (!getStamp().hasAudio) return;
     if (!audioContext) {
@@ -97,7 +110,7 @@ export function createMediaController({ getStamp, getMessage, getMessageVersion,
 
     previewVideo.muted = false;
     exportVideo.muted = false;
-    if (!editingText && !manuallyPaused && !rendering) previewVideo.play().catch(() => {});
+    if (!editingText && !editingAppearance && !manuallyPaused && !rendering) previewVideo.play().catch(() => {});
     if (audioContext.state === "suspended") {
       await audioContext.resume();
     }
@@ -149,9 +162,11 @@ export function createMediaController({ getStamp, getMessage, getMessageVersion,
   function drawFrame(elapsedSeconds, message, canvas = exportCanvas, context = exportContext, slideEasing = 0.16) {
     const width = canvas.width;
     const height = canvas.height;
-    const { lines, widths, size, lineHeight } = layoutText(context, message, width, height);
-    const totalHeight = lineHeight * lines.length;
-    const startY = height * 0.5 - totalHeight * 0.5 + size * 0.78;
+    const appearance = exportAppearance || getAppearance();
+    const layout = layoutText(context, message, width, height, appearance);
+    const { lines, size, lineHeight } = layout;
+    const placement = placeText(layout, width, height, appearance.position, "right", appearance.alignment);
+    const startY = placement.y + layout.baseline;
 
     context.fillStyle = "#ffffff";
     context.fillRect(0, 0, width, height);
@@ -174,22 +189,32 @@ export function createMediaController({ getStamp, getMessage, getMessageVersion,
     };
     if (opaqueSource) drawSource();
     context.textBaseline = "alphabetic";
-    context.font = `700 ${size}px Georgia, "Times New Roman", serif`;
+    context.font = `700 ${size}px ${layout.font}`;
     context.fillStyle = "#171714";
 
-    const desiredSlide = sideOppositeCharacter() === "left" ? 1 : 0;
-    exportSlide += (desiredSlide - exportSlide) * slideEasing;
+    if (!appearance.position) {
+      const desiredSlide = sideOppositeCharacter() === "left" ? 1 : 0;
+      exportSlide += (desiredSlide - exportSlide) * slideEasing;
+    }
     context.textAlign = "left";
+    const right = placeText(layout, width, height, null, "right");
+    const left = placeText(layout, width, height, null, "left");
+    const rightAlign = appearance.alignment === "auto" ? "right" : appearance.alignment;
+    const leftAlign = appearance.alignment === "auto" ? "left" : appearance.alignment;
 
-    lines.forEach((line, index) => {
+    lines.forEach((_, index) => {
       const delay = index * 0.1;
       const entryProgress = Math.max(0, Math.min(1, (elapsedSeconds - delay) / 0.55));
       const entryEase = 1 - Math.pow(1 - entryProgress, 3);
-      const rightX = width * 0.95 - widths[index];
-      const leftX = width * 0.05;
-      const lineX = rightX + (leftX - rightX) * exportSlide + (1 - entryEase) * width * 0.035;
+      const rightX = right.x + textLineX(layout, index, rightAlign);
+      const leftX = left.x + textLineX(layout, index, leftAlign);
+      const lineX = appearance.position
+        ? placement.x + textLineX(layout, index, placement.align)
+        : rightX + (leftX - rightX) * exportSlide + (1 - entryEase) * width * 0.035;
       context.globalAlpha = entryEase;
-      context.fillText(line, lineX, startY + index * lineHeight);
+      textRuns(layout, index, appearance.alignment).forEach((run) => {
+        context.fillText(run.text, lineX + run.x, startY + index * lineHeight);
+      });
     });
 
     context.globalAlpha = 1;
@@ -297,6 +322,8 @@ export function createMediaController({ getStamp, getMessage, getMessageVersion,
 
   function setBusy(isBusy) {
     rendering = isBusy;
+    if (isBusy) exportAppearance = normalizeAppearance(getAppearance());
+    onBusyChanged(isBusy);
     stampButtons.forEach((button) => { button.disabled = isBusy; });
     if (isBusy) previewVideo.pause();
     status.classList.toggle("is-busy", isBusy);
@@ -305,6 +332,7 @@ export function createMediaController({ getStamp, getMessage, getMessageVersion,
   }
 
   async function prepareExportCanvas(longEdge) {
+    await loadTextFont(exportAppearance.fontId);
     exportVideo.load();
     if (exportVideo.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) {
       await new Promise((resolve, reject) => {
@@ -470,6 +498,8 @@ export function createMediaController({ getStamp, getMessage, getMessageVersion,
       status.textContent = "Couldn’t render—try again";
     } finally {
       rendering = false;
+      exportAppearance = undefined;
+      onBusyChanged(false);
       stampButtons.forEach((button) => { button.disabled = false; });
       cancelAnimationFrame(animationFrame);
       if (recorder?.state === "recording") recorder.stop();
@@ -568,6 +598,8 @@ export function createMediaController({ getStamp, getMessage, getMessageVersion,
       status.textContent = "Couldn’t render GIF — try again";
     } finally {
       rendering = false;
+      exportAppearance = undefined;
+      onBusyChanged(false);
       stampButtons.forEach((button) => { button.disabled = false; });
       exportVideo.pause();
       exportVideo.currentTime = VIDEO_START;
@@ -693,7 +725,7 @@ export function createMediaController({ getStamp, getMessage, getMessageVersion,
   // If audible playback is requested, unlock it on the next gesture.
   // The speaker button handles its own gesture.
   const unlockAudio = (event) => {
-    if (event.target.closest?.("#sound-button") || !soundEnabled || soundUnlocked) return;
+    if (event.target.closest?.("#sound-button, #text-overlay") || !soundEnabled || soundUnlocked) return;
     prepareAudio().then(playPreview).catch(console.error);
   };
   document.addEventListener("pointerdown", unlockAudio, { capture: true });
@@ -707,7 +739,7 @@ export function createMediaController({ getStamp, getMessage, getMessageVersion,
     togglePlayback();
   });
   stage.addEventListener("click", (event) => {
-    if (!event.target.closest(".stage-controls")) togglePlayback();
+    if (!event.target.closest(".stage-controls, #text-overlay")) togglePlayback();
   });
 
   previewVideo.addEventListener("play", updatePlayButton);
@@ -716,7 +748,7 @@ export function createMediaController({ getStamp, getMessage, getMessageVersion,
   gifDownloadButton.addEventListener("click", downloadGif);
   return {
     get rendering() { return rendering; },
-    invalidate, resetSource, playPreview, pauseWhileEditing, resumeAfterEditing,
+    invalidate, resetSource, playPreview, pauseWhileEditing, resumeAfterEditing, beginTextGesture,
     updatePlayButton, updateSoundButton, startPreviewMuted, monitorCleanPlayback,
     renderedFile, canShareRenderedVideo
   };

@@ -1,0 +1,117 @@
+@font-face {
+  font-family: "Cutu Nunito Sans";
+  src: url("/fonts/nunito-sans-700.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Cutu Caveat";
+  src: url("/fonts/caveat-700.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Cutu Roboto Mono";
+  src: url("/fonts/roboto-mono-700.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+}
+
+.preview-text {
+  top: 0;
+  transform: translate(var(--text-x, 0px), var(--text-y, 0px));
+  pointer-events: none;
+}
+.preview-text svg { display: block; fill: currentColor; }
+.text-overlay {
+  position: absolute;
+  z-index: 5;
+  left: 0;
+  top: 0;
+  transform: translate(var(--overlay-x, 0px), var(--overlay-y, 0px));
+  transition: transform 820ms cubic-bezier(0.22, 0.82, 0.26, 1);
+  border: 1px solid transparent;
+  border-radius: 4px;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.text-overlay.no-transition, .text-overlay.is-dragging { transition: none; }
+.text-overlay.is-dragging { cursor: grabbing; border-color: var(--soft-ink); }
+.text-overlay:focus-visible { outline: 2px solid var(--soft-ink); outline-offset: 3px; }
+.text-overlay[aria-disabled="true"] { pointer-events: none; }
+.text-guide { position: absolute; z-index: 4; pointer-events: none; display: none; background: var(--soft-ink); opacity: 0.7; }
+.text-guide-x { left: 50%; top: 5%; width: 1px; height: 90%; }
+.text-guide-y { top: 50%; left: 5%; height: 1px; width: 90%; }
+.show-text-guide-x .text-guide-x, .show-text-guide-y .text-guide-y { display: block; }
+
+.sketch-field { border: 1px solid var(--line); border-radius: 16px; }
+.sketch-field textarea { border: 0; border-radius: 14px 14px 0 0; }
+.sketch-field:has(textarea:focus-visible) { border-color: #b9b7b1; }
+.text-appearance {
+  min-width: 0;
+  margin: 0 16px;
+  padding: 10px 0 12px;
+  border: 0;
+}
+.text-format-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 12px; }
+.text-format-row select {
+  min-width: 0;
+  width: 100%;
+  min-height: 44px;
+  padding: 6px 36px 6px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--paper);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 20 20' fill='none' stroke='%2376736d' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m5 7.5 5 5 5-5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  -webkit-appearance: none;
+  appearance: none;
+  -webkit-tap-highlight-color: transparent;
+  color: var(--ink);
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: 700;
+  outline: none;
+  box-shadow: none;
+}
+.text-format-row select:focus, .text-format-row select:focus-visible { outline: none; box-shadow: none; }
+.text-format-row select[aria-busy="true"] { opacity: 0.6; }
+.text-alignment { display: flex; flex: none; gap: 2px; }
+.text-alignment button { display: grid; place-items: center; width: 44px; height: 44px; padding: 0; border: 1px solid transparent; border-radius: 7px; background: transparent; color: var(--soft-ink); cursor: pointer; }
+.text-alignment button[aria-pressed="true"] { border-color: var(--line); color: var(--soft-ink); background: #f7f6f2; }
+.text-alignment button:hover { color: var(--ink); background: #f7f6f2; }
+.text-alignment svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; }
+.text-size-row { display: flex; align-items: center; gap: 12px; margin-top: 8px; min-height: 44px; font-size: 12px; color: var(--soft-ink); }
+.text-size-row label { flex: none; margin: 0; }
+.text-size-row input { min-width: 0; flex: 1; height: 44px; margin: 0; padding: 0; accent-color: var(--ink); cursor: pointer; }
+.text-size-row output { width: 4ch; flex: none; text-align: right; font-variant-numeric: tabular-nums; }
+.text-reset { flex: none; margin-left: auto; min-width: 44px; min-height: 44px; padding: 0 8px; border: 0; border-radius: 6px; background: transparent; color: var(--soft-ink); font-size: 12px; cursor: pointer; text-decoration: none; }
+.text-appearance button:focus-visible, .text-size-row input:focus-visible { outline: 2px solid var(--line); outline-offset: 2px; }
+.text-appearance:disabled { opacity: 0.55; }
+.text-appearance:disabled button, .text-appearance:disabled input, .text-appearance:disabled select { cursor: wait; }
+.text-help { margin: 2px 0 0; color: var(--soft-ink); font-family: "Arial Narrow", "Avenir Next Condensed", "Segoe UI", sans-serif; font-size: 11px; font-weight: 800; letter-spacing: 0.07em; line-height: 1.5; }
+.text-appearance-footer { display: flex; align-items: center; justify-content: space-between; gap: 6px 12px; flex-wrap: wrap; }
+.text-motion { display: flex; align-items: center; gap: 7px; margin: 0; min-height: 44px; color: var(--soft-ink); font-size: 12px; cursor: pointer; }
+.text-motion[hidden] { display: none; }
+.text-motion input { width: 18px; height: 18px; margin: 0; accent-color: var(--ink); cursor: pointer; }
+.text-motion input:focus-visible { outline: 2px solid var(--line); outline-offset: 3px; }
+@media (max-width: 480px) {
+  .text-appearance { margin-inline: 8px; }
+  .text-format-row { gap: 8px; }
+  .text-format-row select { padding-left: 6px; padding-right: 22px; background-position: right 4px center; text-overflow: ellipsis; }
+  .text-alignment { gap: 0; }
+  .text-size-row { margin-top: 2px; gap: 8px; }
+}
+@media (max-width: 360px) {
+  .app-shell { padding-inline: 12px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .text-overlay { transition: none; }
+}

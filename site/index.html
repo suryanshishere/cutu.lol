@@ -27,6 +27,7 @@
     <script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"WebSite","@id":"https://cutu.suryansh.lol/#website","name":"cutu","url":"https://cutu.suryansh.lol/"},{"@type":"WebApplication","@id":"https://cutu.suryansh.lol/#app","name":"cutu Personalized Meme Maker","url":"https://cutu.suryansh.lol/","description":"Create personalized memes with your own text. Choose Baby Boo or Speed, preview your animated meme, then download a video or GIF or share a personalized link for free.","image":"https://cutu.suryansh.lol/share-card.png?v=2","applicationCategory":"MultimediaApplication","operatingSystem":"Any","inLanguage":"en","isAccessibleForFree":true,"offers":{"@type":"Offer","price":"0","priceCurrency":"USD"}},{"@type":"WebPage","name":"Personalized Meme Maker | cutu","description":"Create personalized memes with your own text. Choose Baby Boo or Speed, preview your animated meme, then download a video or GIF or share a personalized link for free.","url":"https://cutu.suryansh.lol/","image":"https://cutu.suryansh.lol/share-card.png?v=2","isPartOf":{"@id":"https://cutu.suryansh.lol/#website"},"about":{"@id":"https://cutu.suryansh.lol/#app"}}]}</script>
     <link rel="icon" type="image/png" href="/baby-boo-stamp.png" />
     <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="text-editor.css" />
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-B04H26G5QT"></script>
     <script>
       window.dataLayer = window.dataLayer || [];
@@ -75,6 +76,35 @@
                 aria-label="Video Text"
                 placeholder="Type Something..."
               >Small steps. Big wheel energy.</textarea>
+              <fieldset id="text-appearance" class="text-appearance">
+                <legend class="visually-hidden">Text appearance</legend>
+                <div class="text-format-row">
+                  <label class="visually-hidden" for="text-font">Text font</label>
+                  <select id="text-font" aria-label="Text font">
+                    <option value="classic">Classic</option>
+                    <option value="bold">Bold sans</option>
+                    <option value="handwritten">Handwritten</option>
+                    <option value="typewriter">Typewriter</option>
+                  </select>
+                  <div class="text-alignment" role="group" aria-label="Text alignment">
+                    <button type="button" data-align="left" aria-label="Align left" title="Align left" aria-pressed="false"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 4h14M3 8h9M3 12h14M3 16h9" /></svg></button>
+                    <button type="button" data-align="center" aria-label="Align center" title="Align center" aria-pressed="false"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 4h14M6 8h8M3 12h14M6 16h8" /></svg></button>
+                    <button type="button" data-align="right" aria-label="Align right" title="Align right" aria-pressed="true"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 4h14M8 8h9M3 12h14M8 16h9" /></svg></button>
+                    <button type="button" data-align="justify" aria-label="Justify text" title="Justify text" aria-pressed="false"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 4h14M3 8h14M3 12h14M3 16h14" /></svg></button>
+                  </div>
+                </div>
+                <div class="text-size-row">
+                  <label for="text-size">Size</label>
+                  <input id="text-size" type="range" min="50" max="200" step="1" value="90" />
+                  <output id="text-size-value" for="text-size">90%</output>
+                  <button id="text-reset" class="text-reset" type="button">Reset</button>
+                </div>
+                <div class="text-appearance-footer">
+                  <p id="text-help" class="text-help">Drag the text in the preview to place it.</p>
+                  <label id="text-motion-option" class="text-motion" for="text-motion"><input id="text-motion" type="checkbox" checked />Text motion</label>
+                </div>
+                <p id="appearance-status" class="visually-hidden" role="status" aria-live="polite"></p>
+              </fieldset>
             </div>
             <p id="status" class="visually-hidden" role="status" aria-live="polite">Ready</p>
           </form>
@@ -82,7 +112,10 @@
 
         <div class="preview-column">
           <div id="stage" class="stage" data-stamp="baby-boo" aria-label="Baby Boo Video Preview">
-            <div id="preview-text" class="preview-text is-right"></div>
+            <div id="preview-text" class="preview-text is-right" aria-hidden="true"></div>
+            <div id="text-overlay" class="text-overlay" role="group" tabindex="0" aria-label="Move video text with arrow keys" aria-describedby="text-help" aria-disabled="false"></div>
+            <div class="text-guide text-guide-x" aria-hidden="true"></div>
+            <div class="text-guide text-guide-y" aria-hidden="true"></div>
             <video
               id="meme-video"
               class="meme-video"

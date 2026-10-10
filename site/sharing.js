@@ -1,7 +1,7 @@
 import { createShareUrl } from "./memes.js";
 import { mobileSaveNeedsTap } from "./media.js";
 
-export function createSharingController({ media, getStamp, getMessage, showActionMessage }) {
+export function createSharingController({ media, getStamp, getMessage, getAppearance, showActionMessage }) {
   const shareButton = document.querySelector("#share-button");
   const shareLabel = document.querySelector("#share-label");
   const shareIcon = document.querySelector("#share-icon");
@@ -20,7 +20,7 @@ export function createSharingController({ media, getStamp, getMessage, showActio
   }
 
   async function shareVideo() {
-    const shareUrl = createShareUrl(location.origin, getStamp().id, getMessage());
+    const shareUrl = createShareUrl(location.origin, getStamp().id, getMessage(), getAppearance());
     const linkText = shareUrl.href;
 
     try {

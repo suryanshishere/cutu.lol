@@ -1,5 +1,7 @@
 import { MEMES, DEFAULT_STAMP, MAX_TEXT_LENGTH, FRAME_ASPECT_RATIO, getMeme, normalizeText, readMemeUrl } from "./memes.js";
-import { layoutText } from "./text-layout.js";
+import { layoutText, placeText, textLineX, textRuns } from "./text-layout.js";
+import { normalizeAppearance } from "./text-appearance.js";
+import { createTextEditor } from "./text-editor.js";
 import { createMediaController } from "./media.js";
 import { createDownloadDialog } from "./download-dialog.js";
 import { createSharingController } from "./sharing.js";
@@ -25,15 +27,29 @@ let selectedStamp = DEFAULT_STAMP;
 let textSide = "right";
 let messageVersion = 0;
 let actionMessageTimer;
+const initial = readMemeUrl(new URL(location.href));
+let appearance = initial.appearance;
+let previewLayout;
 const getStamp = () => getMeme(selectedStamp);
 const getMessage = () => normalizeText(messageInput.value) || getStamp().defaultText;
+const getAppearance = () => appearance;
 const downloads = createDownloadDialog({ isRendering: () => media.rendering });
 const media = createMediaController({
-  getStamp, getMessage, getMessageVersion: () => messageVersion,
+  getStamp, getMessage, getAppearance, getMessageVersion: () => messageVersion,
   sideOppositeCharacter, setTextSide, syncTextToCharacter, showActionMessage, downloads,
-  onExportChanged: () => sharing.updateShareLabel()
+  onExportChanged: () => sharing.updateShareLabel(),
+  onBusyChanged: (busy) => editor.setBusy(busy)
 });
-const sharing = createSharingController({ media, getStamp, getMessage, showActionMessage });
+const sharing = createSharingController({ media, getStamp, getMessage, getAppearance, showActionMessage });
+const editor = createTextEditor({
+  stage, previewText, getStamp, getAppearance, isRendering: () => media.rendering,
+  beginGesture: media.beginTextGesture,
+  onChange: (next) => {
+    appearance = normalizeAppearance(next);
+    layoutPreviewText();
+    invalidateDesign();
+  }
+});
 function showActionMessage(message, duration = 1800) {
   actionMessage.classList.remove("is-visible");
   actionMessage.textContent = message;
@@ -88,19 +104,21 @@ function restartTextAnimation() {
 }
 
 function positionPreviewText(animate = true) {
-  if (!stage.clientWidth || !previewText.offsetWidth) return;
-  const leftEdge = stage.clientWidth * 0.05;
-  const rightEdge = stage.clientWidth * 0.95;
-  const targetX = textSide === "right"
-    ? Math.max(leftEdge, rightEdge - previewText.offsetWidth)
-    : leftEdge;
-
-  previewText.classList.toggle("no-transition", !animate);
-  previewText.style.setProperty("--text-x", `${targetX}px`);
-  if (!animate) requestAnimationFrame(() => previewText.classList.remove("no-transition"));
+  if (!stage.clientWidth || !previewLayout) return;
+  const placement = placeText(previewLayout, stage.clientWidth, stage.clientHeight, appearance.position, textSide, appearance.alignment);
+  const fixed = Boolean(appearance.position);
+  previewText.classList.toggle("no-transition", !animate || fixed);
+  previewText.style.setProperty("--text-x", `${placement.x}px`);
+  previewText.style.setProperty("--text-y", `${placement.y}px`);
+  previewText.querySelectorAll("g").forEach((line, index) => {
+    line.setAttribute("transform", `translate(${textLineX(previewLayout, index, placement.align)} 0)`);
+  });
+  editor.sync(previewLayout, placement, animate);
+  if (!animate && !fixed) requestAnimationFrame(() => previewText.classList.remove("no-transition"));
 }
 
 function setTextSide(side, animate = true) {
+  if (appearance.position) { positionPreviewText(false); return; }
   if (side === textSide) {
     positionPreviewText(animate);
     return;
@@ -161,7 +179,7 @@ function sideOppositeCharacter() {
 }
 
 function syncTextToCharacter() {
-  if (!previewVideo.duration) return;
+  if (!previewVideo.duration || appearance.position || editor.interacting) return;
   const nextSide = sideOppositeCharacter();
   if (nextSide !== textSide) setTextSide(nextSide);
 }
@@ -193,12 +211,29 @@ function updateStageRatio() {
 
 function layoutPreviewText() {
   if (!stage.clientWidth || !stage.clientHeight) return;
-  const layout = layoutText(previewMeasureContext, getMessage(), stage.clientWidth, stage.clientHeight);
-  previewText.textContent = layout.lines.join("\n");
+  const layout = layoutText(previewMeasureContext, getMessage(), stage.clientWidth, stage.clientHeight, appearance);
+  previewLayout = layout;
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("width", String(layout.width));
+  svg.setAttribute("height", String(layout.height));
+  svg.style.overflow = "visible";
+  layout.lines.forEach((_, index) => {
+    const group = document.createElementNS(svg.namespaceURI, "g");
+    textRuns(layout, index, appearance.alignment).forEach((run) => {
+      const line = document.createElementNS(svg.namespaceURI, "text");
+      line.textContent = run.text;
+      line.setAttribute("x", String(run.x));
+      line.setAttribute("y", String(layout.baseline + index * layout.lineHeight));
+      group.append(line);
+    });
+    svg.append(group);
+  });
+  previewText.replaceChildren(svg);
+  previewText.style.fontFamily = layout.font;
   previewText.style.fontSize = `${layout.size}px`;
   previewText.style.lineHeight = `${layout.lineHeight}px`;
-  previewText.style.width = `${Math.ceil(layout.width + 1)}px`;
-  previewText.style.top = `${stage.clientHeight / 2}px`;
+  previewText.style.width = `${layout.width}px`;
+  previewText.style.height = `${layout.height}px`;
   positionPreviewText(false);
 }
 function updateLivePreview() {
@@ -206,6 +241,9 @@ function updateLivePreview() {
   messageInput.style.height = "auto";
   messageInput.style.height = `${Math.min(320, Math.max(118, messageInput.scrollHeight))}px`;
   restartTextAnimation();
+  invalidateDesign();
+}
+function invalidateDesign() {
   messageVersion += 1;
   media.invalidate();
   if (!media.rendering) downloads.resetDownloadState();
@@ -222,7 +260,7 @@ previewVideo.addEventListener("seeked", syncTextToCharacter);
 window.addEventListener("resize", layoutPreviewText);
 stampButtons.forEach((button) => button.addEventListener("click", () => selectStamp(button.dataset.stamp)));
 form.addEventListener("submit", (event) => event.preventDefault());
-const initial = readMemeUrl(new URL(location.href));
+await editor.ready();
 selectStamp(initial.meme.id, false);
 messageInput.value = initial.message;
 messageInput.maxLength = MAX_TEXT_LENGTH;

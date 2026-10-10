@@ -18,13 +18,13 @@
 }
 
 html {
-  min-width: 320px;
+  min-width: 0;
   background: var(--paper);
 }
 
 body {
   margin: 0;
-  min-width: 320px;
+  min-width: 0;
   min-height: 100vh;
   background: var(--paper);
   isolation: isolate;
@@ -355,7 +355,7 @@ textarea::placeholder {
 }
 
 #sound-icon.is-on {
-  color: var(--ink);
+  color: var(--soft-ink);
 }
 
 .download-button {
@@ -687,7 +687,7 @@ textarea {
   border: 1px solid var(--line);
   border-radius: 50%;
   background: rgb(255 255 255 / 92%);
-  color: var(--ink);
+  color: var(--soft-ink);
   cursor: pointer;
   box-shadow: none;
 }
@@ -702,12 +702,12 @@ textarea {
 }
 
 .stage.needs-sound + .preview-tools #sound-button {
-  border-color: var(--ink);
-  background: var(--cheese);
+  border-color: var(--soft-ink);
+  background: var(--stage);
 }
 
 .stage-control:focus-visible {
-  outline: 3px solid var(--cheese);
+  outline: 2px solid var(--line);
   outline-offset: 3px;
 }
 
