@@ -9,7 +9,7 @@ import { handleEmailIntake } from "./src/email-intake.js";
 import { createLocalEmailStore } from "./src/local-email-store.js";
 import { readFile } from "node:fs/promises";
 import { adminPageHeaders, createMemoryAdminStore, dashboardPage, handleAdminRequest } from "./src/admin.js";
-import { createMemoryDownloadStore, handleDownloadEvent } from "./src/download-events.js";
+import { createMemoryDownloadStore, handleDownloadEvent, templateDownloadRows } from "./src/download-events.js";
 
 try { process.loadEnvFile(); } catch (error) { if (error.code !== "ENOENT") throw error; }
 
@@ -22,7 +22,8 @@ async function readLocalDashboard(offset) {
   let emails;
   try { emails = JSON.parse(await readFile(resolve(".local-data", "emails.json"), "utf8")); }
   catch (error) { if (error.code !== "ENOENT") throw error; emails = []; }
-  return { ...dashboardPage(emails, { today: null, total: null }, offset), downloads: downloadStore.readCounts() };
+  const downloads = downloadStore.readCounts();
+  return { ...dashboardPage(emails, { today: null, total: null }, offset), downloads, templateDownloads: templateDownloadRows(downloads, downloadStore.readTemplates()) };
 }
 const cardStamps = new Map();
 function loadCardStamp(meme) {

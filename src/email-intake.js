@@ -1,6 +1,6 @@
 import { createAdminStore, dashboardPage, handleAdminRequest } from "./admin.js";
 import { readJsonBody } from "./json-body.js";
-import { DOWNLOAD_EVENT_TTL_MS, handleDownloadEvent } from "./download-events.js";
+import { DOWNLOAD_EVENT_TTL_MS, handleDownloadEvent, templateDownloadRows } from "./download-events.js";
 
 const MAX_BODY_BYTES = 1024;
 
@@ -59,17 +59,25 @@ export class EmailIntake {
         const counts = await counter.fetch("https://visit-counter/");
         if (!counts.ok) throw new Error("Counts unavailable");
         const downloads = (await this.state.storage.get("stats:downloads")) || { video: 0, gif: 0 };
-        return { ...dashboardPage(emails, await counts.json(), offset), downloads };
+        const templates = (await this.state.storage.get("stats:download-templates")) || {};
+        return { ...dashboardPage(emails, await counts.json(), offset), downloads, templateDownloads: templateDownloadRows(downloads, templates) };
       });
     }
     if (url.pathname === "/api/download-event") {
-      return handleDownloadEvent(request, async ({ format, id }) => {
+      return handleDownloadEvent(request, async ({ format, id, template }) => {
         await this.state.storage.transaction(async (storage) => {
           const key = `download:${id}`;
           if (await storage.get(key)) return;
           const counts = (await storage.get("stats:downloads")) || { video: 0, gif: 0 };
           counts[format] += 1;
-          await storage.put({ "stats:downloads": counts, [key]: Date.now() });
+          const updates = { "stats:downloads": counts, [key]: Date.now() };
+          if (template) {
+            const templates = (await storage.get("stats:download-templates")) || {};
+            templates[template] ||= { video: 0, gif: 0 };
+            templates[template][format] += 1;
+            updates["stats:download-templates"] = templates;
+          }
+          await storage.put(updates);
         });
         if (!await this.state.storage.getAlarm()) await this.state.storage.setAlarm(Date.now() + DOWNLOAD_EVENT_TTL_MS);
       });

@@ -1,4 +1,5 @@
 import { mobileSaveNeedsTap } from "./media.js";
+import { DEFAULT_STAMP } from "./memes.js";
 
 export function createDownloadDialog({ isRendering }) {
   const downloadToggle = document.querySelector("#download-toggle");
@@ -23,6 +24,7 @@ export function createDownloadDialog({ isRendering }) {
   let emailAccepted = false;
   try { emailAccepted = localStorage.getItem(EMAIL_INTAKE_KEY) === "1"; } catch { /* Use page memory when storage is unavailable. */ }
   let emailSubmitting = false;
+  let selectedTemplate = DEFAULT_STAMP;
   let downloadState = "choose";
   function setDownloadState(state, label, url = "", filename = "") {
     const previousState = downloadState;
@@ -146,7 +148,7 @@ export function createDownloadDialog({ isRendering }) {
     const format = emailForm.elements.format.value;
     fetch("/api/download-event", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ format, id: crypto.randomUUID() }), keepalive: true
+      body: JSON.stringify({ format, template: selectedTemplate, id: crypto.randomUUID() }), keepalive: true
     }).catch(() => {});
     if (format === "gif") gifDownloadButton.click();
     else downloadButton.click();
@@ -204,6 +206,7 @@ export function createDownloadDialog({ isRendering }) {
   window.addEventListener("resize", updateDownloadViewport);
   return {
     setMeme(meme) {
+      selectedTemplate = meme.id;
       const image = downloadDialog.querySelector(".download-stamp");
       image.src = meme.image;
       image.alt = meme.name;

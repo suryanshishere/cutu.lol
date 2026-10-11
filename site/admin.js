@@ -26,6 +26,7 @@ function showLogin(message = "") {
   emails = [];
   search.value = "";
   document.querySelector("#email-rows").replaceChildren();
+  document.querySelector("#template-rows").replaceChildren();
   dashboard.hidden = true;
   logout.hidden = true;
   loginPanel.hidden = false;
@@ -65,6 +66,21 @@ function renderEmails() {
   document.querySelector("#email-count").textContent = `${number(filtered.length)} of ${number(emails.length)} emails`;
 }
 
+function renderTemplates(templates) {
+  const rows = document.createDocumentFragment();
+  for (const entry of templates) {
+    const row = document.createElement("tr");
+    for (const [label, value] of [["Template", entry.name], ["Video", number(entry.video)], ["GIF", number(entry.gif)], ["Total", number(entry.total)]]) {
+      const cell = document.createElement("td");
+      cell.dataset.label = label;
+      cell.textContent = value;
+      row.append(cell);
+    }
+    rows.append(row);
+  }
+  document.querySelector("#template-rows").replaceChildren(rows);
+}
+
 async function loadDashboard() {
   const version = ++loadVersion;
   refresh.disabled = true;
@@ -81,6 +97,7 @@ async function loadDashboard() {
       document.querySelector("#visitors-total").textContent = number(result.visits.total);
       document.querySelector("#downloads-total").textContent = number(result.downloads.video + result.downloads.gif);
       document.querySelector("#download-formats").textContent = `Video ${number(result.downloads.video)} · GIF ${number(result.downloads.gif)}`;
+      renderTemplates(result.templateDownloads);
       for (const entry of result.emails) collected.set(entry.email, entry);
       emails = [...collected.values()];
       renderEmails();

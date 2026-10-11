@@ -104,3 +104,47 @@ test("download counts deduplicate requests and reject invalid events", async () 
   assert.deepEqual(entries.get("stats:downloads"), { video: 1, gif: 1 });
   assert.equal((await intake.fetch(event({ format: "other", id }))).status, 400);
 });
+
+test("persistent template counts reach the protected dashboard and survive cleanup", async () => {
+  const entries = new Map([["stats:downloads", { video: 8, gif: 4 }]]);
+  const storage = {
+    get: async (key) => structuredClone(entries.get(key)),
+    put: async (key, value) => {
+      if (typeof key === "object") for (const [name, item] of Object.entries(key)) entries.set(name, structuredClone(item));
+      else entries.set(key, structuredClone(value));
+    },
+    list: async ({ prefix }) => new Map([...entries].filter(([key]) => key.startsWith(prefix)).sort(([a], [b]) => a.localeCompare(b))),
+    delete: async (keys) => { for (const key of Array.isArray(keys) ? keys : [keys]) entries.delete(key); },
+    transaction: async (fn) => fn(storage), getAlarm: async () => 123, setAlarm: async () => {}
+  };
+  const intakeEnv = { ...env, VISIT_COUNTER: {
+    idFromName: (name) => name, get: () => ({ fetch: async () => Response.json({ today: 2, total: 10 }) })
+  } };
+  const intake = new EmailIntake({ storage }, intakeEnv);
+  const record = (body) => intake.fetch(new Request(`${origin}/api/download-event`, {
+    method: "POST", headers: { "Content-Type": "application/json", Origin: origin }, body: JSON.stringify(body)
+  }));
+  const id = crypto.randomUUID();
+  assert.equal((await record({ id, format: "gif", template: "speed" })).status, 200);
+  assert.equal((await record({ id, format: "video", template: "baby-boo" })).status, 200);
+  assert.equal((await record({ id: crypto.randomUUID(), format: "video", template: "baby-boo" })).status, 200);
+  assert.equal((await record({ id: crypto.randomUUID(), format: "gif", template: "invalid" })).status, 400);
+  assert.deepEqual(entries.get("stats:download-templates"), { speed: { video: 0, gif: 1 }, "baby-boo": { video: 1, gif: 0 } });
+  assert.equal((await intake.fetch(request("dashboard"))).status, 401);
+  const login = await intake.fetch(request("login", { email: env.ADMIN_EMAIL, password }));
+  const cookie = login.headers.get("Set-Cookie").split(";")[0];
+  entries.set(`download:${id}`, 1);
+  await intake.alarm();
+  assert.equal(entries.has(`download:${id}`), false);
+  // Recreate the object to verify aggregates come from durable storage.
+  const restarted = new EmailIntake({ storage }, intakeEnv);
+  const response = await restarted.fetch(request("dashboard", undefined, cookie));
+  assert.equal(response.status, 200);
+  const result = await response.json();
+  assert.deepEqual(result.downloads, { video: 9, gif: 5 });
+  assert.deepEqual(result.templateDownloads, [
+    { id: "unknown", name: "Template not recorded", video: 8, gif: 4, total: 12 },
+    { id: "baby-boo", name: "Baby Boo", video: 1, gif: 0, total: 1 },
+    { id: "speed", name: "Speed", video: 0, gif: 1, total: 1 }
+  ]);
+});

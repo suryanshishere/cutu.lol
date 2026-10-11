@@ -36,6 +36,9 @@ input { width: 100%; min-height: 48px; border: 2px solid var(--ink); border-radi
 .metrics span, .metrics small { display: block; color: var(--soft); font-size: 12px; }
 .metrics strong { display: block; font-family: Lora, Georgia, serif; font-size: 36px; line-height: 1.25; margin: 12px 0 6px; font-weight: 600; }
 .metrics small { line-height: 1.5; }
+.template-section { margin-bottom: 40px; }
+.template-section td:not(:first-child), .template-section th:not(:first-child) { text-align: right; font-variant-numeric: tabular-nums; }
+.template-section td:last-child { color: var(--ink); font-size: 14px; font-weight: 700; }
 .search-label { width: min(260px, 50%); }
 .search-label input { border-width: 1px; border-color: var(--line); border-radius: 999px; font-size: 14px; }
 .table-wrap { overflow-x: auto; margin-top: 20px; border: 1px solid var(--line); border-radius: 14px; }
@@ -68,4 +71,6 @@ td:last-child { font-size: 12px; color: var(--soft); white-space: nowrap; }
  .table-wrap tbody tr { display: grid; gap: 5px; padding: 14px; border-top: 1px solid var(--line); }
  .table-wrap tbody tr:first-child { border-top: 0; }
  .table-wrap td { display: block; padding: 0; border: 0; }
+ .template-section .table-wrap td { display: flex; justify-content: space-between; gap: 16px; text-align: right; }
+ .template-section td::before { content: attr(data-label); color: var(--soft); font-weight: 400; text-align: left; }
 }
