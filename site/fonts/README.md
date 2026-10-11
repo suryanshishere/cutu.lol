@@ -1,6 +1,6 @@
 # Interface and text editor fonts
 
-The interface uses a self-hosted Latin WOFF2 subset of Bricolage Grotesque at weight 400, downloaded from the Google Fonts CSS API on 2026-10-11. Its license is included in `bricolage-grotesque-OFL.txt`. Source: https://github.com/google/fonts/tree/main/ofl/bricolagegrotesque
+The interface uses self-hosted Latin WOFF2 subsets of Bricolage Grotesque at weights 400 and 700, downloaded from the Google Fonts CSS API on 2026-10-11. Visitor counts use weight 700. Its license is included in `bricolage-grotesque-OFL.txt`. Source: https://github.com/google/fonts/tree/main/ofl/bricolagegrotesque
 
 The editor self-hosts Latin WOFF2 subsets at weight 700, downloaded from the Google Fonts CSS API on 2026-10-11. No font service requests are made by visitors. Other scripts and emoji use the browser's fallback fonts.
 
