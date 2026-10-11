@@ -144,7 +144,8 @@ test("persistent template counts reach the protected dashboard and survive clean
   assert.deepEqual(result.downloads, { video: 9, gif: 5 });
   assert.deepEqual(result.templateDownloads, [
     { id: "unknown", name: "Template not recorded", video: 8, gif: 4, total: 12 },
-    { id: "baby-boo", name: "Baby Boo", video: 1, gif: 0, total: 1 },
-    { id: "speed", name: "Speed", video: 0, gif: 1, total: 1 }
+    { id: "baby-boo", name: "baby boo", video: 1, gif: 0, total: 1 },
+      { id: "speed", name: "Speed 1", video: 0, gif: 1, total: 1 },
+      { id: "clip", name: "Speed 2", video: 0, gif: 0, total: 0 }
   ]);
 });

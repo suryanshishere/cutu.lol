@@ -1,6 +1,6 @@
-import { layoutText, placeText, textLineX, textRuns } from "./text-layout.js";
+import { layoutText, placeMemeText, textLineX, textRuns } from "./text-layout.js";
 import { loadTextFont, normalizeAppearance } from "./text-appearance.js";
-import { FRAME_ASPECT_RATIO } from "./memes.js";
+import { exportDimensions, textShadow } from "./memes.js";
 
 export function mobileSaveNeedsTap() {
   return navigator.maxTouchPoints > 0 && window.matchMedia("(pointer: coarse)").matches;
@@ -163,9 +163,10 @@ export function createMediaController({ getStamp, getMessage, getAppearance, get
     const width = canvas.width;
     const height = canvas.height;
     const appearance = exportAppearance || getAppearance();
+    const stamp = getStamp();
     const layout = layoutText(context, message, width, height, appearance);
     const { lines, size, lineHeight } = layout;
-    const placement = placeText(layout, width, height, appearance.position, "right", appearance.alignment);
+    const placement = placeMemeText(layout, width, height, appearance, stamp);
     const startY = placement.y + layout.baseline;
 
     context.fillStyle = "#ffffff";
@@ -175,7 +176,7 @@ export function createMediaController({ getStamp, getMessage, getAppearance, get
     const sourceFrame = cleanEndFrame && activeVideo.currentTime >= videoEnd - 0.04
       ? cleanEndFrame
       : activeVideo;
-    const opaqueSource = Boolean(getStamp().opaqueSource && new URL(activeVideo.currentSrc).pathname === getStamp().opaqueSource);
+    const textAboveVideo = stamp.textLayer === "over" || Boolean(stamp.opaqueSource && new URL(activeVideo.currentSrc).pathname === stamp.opaqueSource);
     const drawSource = () => {
       context.imageSmoothingEnabled = true;
       context.imageSmoothingQuality = "high";
@@ -187,28 +188,32 @@ export function createMediaController({ getStamp, getMessage, getAppearance, get
       const y = bottomLeft ? height - drawHeight : (height - drawHeight) / 2;
       context.drawImage(sourceFrame, x, y, drawWidth, drawHeight);
     };
-    if (opaqueSource) drawSource();
+    if (textAboveVideo) drawSource();
     context.textBaseline = "alphabetic";
     context.font = `700 ${size}px ${layout.font}`;
-    context.fillStyle = "#171714";
+    context.fillStyle = stamp.textColor;
+    if (stamp.textShadow) {
+      const shadow = textShadow(size);
+      context.shadowColor = shadow.color;
+      context.shadowBlur = shadow.blur;
+      context.shadowOffsetY = shadow.offsetY;
+    }
 
     if (!appearance.position) {
-      const desiredSlide = sideOppositeCharacter() === "left" ? 1 : 0;
+      const desiredSlide = stamp.hasTextMotion && sideOppositeCharacter() === "left" ? 1 : 0;
       exportSlide += (desiredSlide - exportSlide) * slideEasing;
     }
     context.textAlign = "left";
-    const right = placeText(layout, width, height, null, "right");
-    const left = placeText(layout, width, height, null, "left");
-    const rightAlign = appearance.alignment === "auto" ? "right" : appearance.alignment;
-    const leftAlign = appearance.alignment === "auto" ? "left" : appearance.alignment;
+    const right = placeMemeText(layout, width, height, appearance, stamp, "right");
+    const left = placeMemeText(layout, width, height, appearance, stamp, "left");
 
     lines.forEach((_, index) => {
       const delay = index * 0.1;
       const entryProgress = Math.max(0, Math.min(1, (elapsedSeconds - delay) / 0.55));
-      const entryEase = 1 - Math.pow(1 - entryProgress, 3);
-      const rightX = right.x + textLineX(layout, index, rightAlign);
-      const leftX = left.x + textLineX(layout, index, leftAlign);
-      const lineX = appearance.position
+      const entryEase = stamp.defaultTextPosition ? 1 : 1 - Math.pow(1 - entryProgress, 3);
+      const rightX = right.x + textLineX(layout, index, right.align);
+      const leftX = left.x + textLineX(layout, index, left.align);
+      const lineX = appearance.position || stamp.defaultTextPosition
         ? placement.x + textLineX(layout, index, placement.align)
         : rightX + (leftX - rightX) * exportSlide + (1 - entryEase) * width * 0.035;
       context.globalAlpha = entryEase;
@@ -219,7 +224,10 @@ export function createMediaController({ getStamp, getMessage, getAppearance, get
 
     context.globalAlpha = 1;
     context.textAlign = "left";
-    if (!opaqueSource) drawSource();
+    context.shadowColor = "transparent";
+    context.shadowBlur = 0;
+    context.shadowOffsetY = 0;
+    if (!textAboveVideo) drawSource();
   }
 
   function seekVideo(time, video = previewVideo) {
@@ -315,7 +323,7 @@ export function createMediaController({ getStamp, getMessage, getAppearance, get
   function monitorCleanPlayback() {
     if (!("requestVideoFrameCallback" in previewVideo)) return;
     previewVideo.requestVideoFrameCallback(() => {
-      if (!rendering) syncTextToCharacter();
+      if (!rendering && getStamp().hasTextMotion) syncTextToCharacter();
       monitorCleanPlayback();
     });
   }
@@ -344,8 +352,9 @@ export function createMediaController({ getStamp, getMessage, getAppearance, get
     const sourceWidth = exportVideo.videoWidth || 1080;
     const sourceHeight = exportVideo.videoHeight || 1080;
     const duration = exportVideo.duration || 9;
-    exportCanvas.width = Math.max(2, Math.round(longEdge / 2) * 2);
-    exportCanvas.height = Math.max(2, Math.round(longEdge / FRAME_ASPECT_RATIO / 2) * 2);
+    const dimensions = exportDimensions(getStamp(), longEdge);
+    exportCanvas.width = dimensions.width;
+    exportCanvas.height = dimensions.height;
     exportSlide = 0;
 
     exportVideo.loop = false;

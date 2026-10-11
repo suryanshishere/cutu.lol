@@ -1,6 +1,6 @@
-import { MEMES, DEFAULT_STAMP, MAX_TEXT_LENGTH, FRAME_ASPECT_RATIO, getMeme, normalizeText, readMemeUrl } from "./memes.js";
-import { layoutText, placeText, textLineX, textRuns } from "./text-layout.js";
-import { normalizeAppearance, restoreAppearance, saveAppearance } from "./text-appearance.js";
+import { MEMES, DEFAULT_STAMP, MAX_TEXT_LENGTH, getMeme, normalizeText, readMemeUrl, previewWidthPercent, textShadow } from "./memes.js";
+import { layoutText, placeMemeText, textLineX, textRuns } from "./text-layout.js";
+import { DEFAULT_APPEARANCE, normalizeAppearance, restoreAppearance, saveAppearance } from "./text-appearance.js";
 import { createTextEditor } from "./text-editor.js";
 import { createMediaController } from "./media.js";
 import { createDownloadDialog } from "./download-dialog.js";
@@ -28,7 +28,8 @@ let textSide = "right";
 let messageVersion = 0;
 let actionMessageTimer;
 const initial = readMemeUrl(new URL(location.href));
-let appearance = restoreAppearance(new URL(location.href), initial.appearance);
+let appearance = restoreAppearance(new URL(location.href), initial.appearance, undefined, initial.meme.id);
+const templateAppearances = new Map([[initial.meme.id, appearance]]);
 let previewLayout;
 const getStamp = () => getMeme(selectedStamp);
 const getMessage = () => normalizeText(messageInput.value) || getStamp().defaultText;
@@ -46,7 +47,8 @@ const editor = createTextEditor({
   beginGesture: media.beginTextGesture,
   onChange: (next) => {
     appearance = normalizeAppearance(next);
-    saveAppearance(appearance);
+    templateAppearances.set(selectedStamp, appearance);
+    saveAppearance(appearance, undefined, location.href, selectedStamp);
     layoutPreviewText();
     invalidateDesign();
   }
@@ -71,7 +73,10 @@ function selectStamp(id, announce = true) {
     messageInput.value = getMeme(id).defaultText;
   }
   selectedStamp = id;
+  appearance = templateAppearances.get(id) ?? restoreAppearance(new URL("/", location.origin), DEFAULT_APPEARANCE, undefined, id);
+  templateAppearances.set(id, appearance);
   const stamp = getMeme(id);
+  messageInput.placeholder = `e.g. ${stamp.defaultText}`;
   for (const [video, sources] of [[previewVideo, stamp.preview], [exportVideo, stamp.export]]) {
     video.pause();
     video.replaceChildren(...sources.map(([src, type]) => {
@@ -94,6 +99,7 @@ function selectStamp(id, announce = true) {
   updateStageRatio();
   setTextSide("right", false);
   updateLivePreview();
+  editor.ready().then(() => { if (selectedStamp === id) layoutPreviewText(); });
   media.playPreview();
   if (announce) showActionMessage(`${stamp.name} stamp selected`);
 }
@@ -106,8 +112,8 @@ function restartTextAnimation() {
 
 function positionPreviewText(animate = true) {
   if (!stage.clientWidth || !previewLayout) return;
-  const placement = placeText(previewLayout, stage.clientWidth, stage.clientHeight, appearance.position, textSide, appearance.alignment);
-  const fixed = Boolean(appearance.position);
+  const placement = placeMemeText(previewLayout, stage.clientWidth, stage.clientHeight, appearance, getStamp(), textSide);
+  const fixed = Boolean(appearance.position || getStamp().defaultTextPosition);
   previewText.classList.toggle("no-transition", !animate || fixed);
   previewText.style.setProperty("--text-x", `${placement.x}px`);
   previewText.style.setProperty("--text-y", `${placement.y}px`);
@@ -152,7 +158,7 @@ function measureCharacterBounds(video = media.rendering ? exportVideo : previewV
 
   const samples = (analysisCanvas.width / 2) * (analysisCanvas.height / 2);
   if (maxX < 0 || occupied > samples * 0.94) return null;
-  const widthFraction = Math.min(1, (video.videoWidth / video.videoHeight) / FRAME_ASPECT_RATIO) * getStamp().scale;
+  const widthFraction = Math.min(1, (video.videoWidth / video.videoHeight) / getStamp().frameAspectRatio) * getStamp().scale;
   const inset = getStamp().anchor === "bottom-left" ? 0 : (1 - widthFraction) / 2;
   return {
     left: inset + minX / analysisCanvas.width * widthFraction,
@@ -161,7 +167,7 @@ function measureCharacterBounds(video = media.rendering ? exportVideo : previewV
 }
 
 function sideOppositeCharacter() {
-  if (getStamp().anchor === "bottom-left") return "right";
+  if (!getStamp().hasTextMotion) return "right";
   const video = media.rendering ? exportVideo : previewVideo;
   const bounds = measureCharacterBounds(video);
   if (bounds) {
@@ -180,7 +186,7 @@ function sideOppositeCharacter() {
 }
 
 function syncTextToCharacter() {
-  if (!previewVideo.duration || appearance.position || editor.interacting) return;
+  if (!getStamp().hasTextMotion || !previewVideo.duration || appearance.position || editor.interacting) return;
   const nextSide = sideOppositeCharacter();
   if (nextSide !== textSide) setTextSide(nextSide);
 }
@@ -204,8 +210,11 @@ function loadVisitStats() {
 function updateStageRatio() {
   const stamp = getStamp();
   stage.dataset.mediaAnchor = stamp.anchor;
+  stage.dataset.textLayer = stamp.textLayer;
   stage.classList.toggle("is-opaque-source", Boolean(stamp.opaqueSource && previewVideo.currentSrc && new URL(previewVideo.currentSrc).pathname === stamp.opaqueSource));
-  stage.style.setProperty("--stage-ratio", String(FRAME_ASPECT_RATIO));
+  stage.style.setProperty("--stage-ratio", String(stamp.frameAspectRatio));
+  stage.style.setProperty("--stage-width", `${previewWidthPercent(stamp)}%`);
+  stage.style.setProperty("--text-color", stamp.textColor);
   previewVideo.style.setProperty("--video-scale", String(stamp.scale));
   requestAnimationFrame(layoutPreviewText);
 }
@@ -218,6 +227,10 @@ function layoutPreviewText() {
   svg.setAttribute("width", String(layout.width));
   svg.setAttribute("height", String(layout.height));
   svg.style.overflow = "visible";
+  if (getStamp().textShadow) {
+    const shadow = textShadow(layout.size);
+    svg.style.filter = `drop-shadow(0 ${shadow.offsetY}px ${shadow.blur}px ${shadow.color})`;
+  }
   layout.lines.forEach((_, index) => {
     const group = document.createElementNS(svg.namespaceURI, "g");
     textRuns(layout, index, appearance.alignment).forEach((run) => {
@@ -261,8 +274,8 @@ previewVideo.addEventListener("seeked", syncTextToCharacter);
 window.addEventListener("resize", layoutPreviewText);
 stampButtons.forEach((button) => button.addEventListener("click", () => selectStamp(button.dataset.stamp)));
 form.addEventListener("submit", (event) => event.preventDefault());
-await editor.ready();
 selectStamp(initial.meme.id, false);
+await editor.ready();
 messageInput.value = initial.message;
 messageInput.maxLength = MAX_TEXT_LENGTH;
 updateLivePreview();

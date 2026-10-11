@@ -31,7 +31,7 @@ test("download validation rejects invalid requests before recording", async () =
   const response = await handleDownloadEvent(request(event), (value) => { recorded = value; });
   assert.deepEqual(recorded, event);
   assert.deepEqual(await response.json(), { ok: true });
-  for (const template of ["baby-boo", "speed"]) {
+  for (const template of ["baby-boo", "speed", "clip"]) {
     const attributed = { ...event, template };
     assert.equal((await handleDownloadEvent(request(attributed), (value) => { recorded = value; })).status, 200);
     assert.deepEqual(recorded, attributed);
@@ -49,20 +49,22 @@ test("template counts follow the first event and survive request ID cleanup", ()
   assert.equal(store.readTemplates().speed.gif, 1);
   store.recordEvent({ format: "video", template: "baby-boo", id }, 1000 + DOWNLOAD_EVENT_TTL_MS);
   assert.deepEqual(templateDownloadRows(store.readCounts(), store.readTemplates()), [
-    { id: "baby-boo", name: "Baby Boo", video: 1, gif: 0, total: 1 },
-    { id: "speed", name: "Speed", video: 0, gif: 1, total: 1 },
-    { id: "unknown", name: "Template not recorded", video: 1, gif: 0, total: 1 }
+    { id: "baby-boo", name: "baby boo", video: 1, gif: 0, total: 1 },
+    { id: "speed", name: "Speed 1", video: 0, gif: 1, total: 1 },
+    { id: "unknown", name: "Template not recorded", video: 1, gif: 0, total: 1 },
+    { id: "clip", name: "Speed 2", video: 0, gif: 0, total: 0 }
   ]);
 });
 
 test("template breakdown preserves historical totals and shows unused templates", () => {
   assert.deepEqual(templateDownloadRows({ video: 0, gif: 0 }), [
-    { id: "baby-boo", name: "Baby Boo", video: 0, gif: 0, total: 0 },
-    { id: "speed", name: "Speed", video: 0, gif: 0, total: 0 }
+    { id: "baby-boo", name: "baby boo", video: 0, gif: 0, total: 0 },
+    { id: "speed", name: "Speed 1", video: 0, gif: 0, total: 0 },
+    { id: "clip", name: "Speed 2", video: 0, gif: 0, total: 0 }
   ]);
   const rows = templateDownloadRows({ video: 20, gif: 12 }, { speed: { video: 3, gif: 2 } });
   assert.deepEqual(rows.map(({ id, total }) => ({ id, total })), [
-    { id: "unknown", total: 27 }, { id: "speed", total: 5 }, { id: "baby-boo", total: 0 }
+    { id: "unknown", total: 27 }, { id: "speed", total: 5 }, { id: "baby-boo", total: 0 }, { id: "clip", total: 0 }
   ]);
   assert.equal(rows.reduce((sum, row) => sum + row.video, 0), 20);
   assert.equal(rows.reduce((sum, row) => sum + row.gif, 0), 12);

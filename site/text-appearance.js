@@ -20,21 +20,41 @@ export function normalizeAppearance(value = {}) {
   const scale = finiteNumber(value?.scale);
   const x = finiteNumber(value?.position?.x);
   const y = finiteNumber(value?.position?.y);
+  const boxWidth = finiteNumber(value?.box?.width);
+  const boxHeight = finiteNumber(value?.box?.height);
   return {
     fontId, scale: scale === null ? DEFAULT_APPEARANCE.scale : clamp(scale, 0.5, 2),
     alignment: TEXT_ALIGNMENTS.includes(value?.alignment) ? value.alignment : "auto",
-    position: x === null || y === null ? null : { x: clamp(x, 0.05, 0.95), y: clamp(y, 0.05, 0.95) }
+    position: x === null || y === null ? null : { x: clamp(x, 0.05, 0.95), y: clamp(y, 0.05, 0.95) },
+    ...(boxWidth === null && boxHeight === null ? {} : {
+      box: { width: boxWidth === null ? null : clamp(boxWidth, 0.05, 0.9), height: boxHeight === null ? null : clamp(boxHeight, 0.05, 0.9) }
+    })
   };
 }
 
 const APPEARANCE_STORAGE_KEY = "cutu.text-appearance.v1";
 
-export function restoreAppearance(url, initial, storage) {
+function appearanceStamp(url) {
+  try { return new URL(url).searchParams.get("stamp") || "baby-boo"; }
+  catch { return "baby-boo"; }
+}
+
+function appearanceStorageKey(stamp) {
+  return `cutu.text-appearance.v2.${stamp}`;
+}
+
+export function restoreAppearance(url, initial, storage, stamp = appearanceStamp(url)) {
   try {
-    const saved = JSON.parse((storage ?? globalThis.localStorage).getItem(APPEARANCE_STORAGE_KEY));
+    const store = storage ?? globalThis.localStorage;
+    let saved = JSON.parse(store.getItem(appearanceStorageKey(stamp)));
+    if (!saved) {
+      // Assign the old global preference only to the template it came from.
+      const legacy = JSON.parse(store.getItem(APPEARANCE_STORAGE_KEY));
+      if (legacy && appearanceStamp(legacy.source) === stamp) saved = legacy;
+    }
     if (!saved) return initial;
     // New shared designs retain their style; edits to the current link survive refresh.
-    const shared = ["text", "stamp", "font", "scale", "align", "x", "y"].some((key) => url.searchParams.has(key));
+    const shared = ["text", "stamp", "font", "scale", "align", "x", "y", "boxWidth", "boxHeight"].some((key) => url.searchParams.has(key));
     if (shared && saved.source !== url.href) return initial;
     return normalizeAppearance(saved.appearance);
   } catch {
@@ -42,9 +62,9 @@ export function restoreAppearance(url, initial, storage) {
   }
 }
 
-export function saveAppearance(appearance, storage, url = globalThis.location?.href) {
+export function saveAppearance(appearance, storage, url = globalThis.location?.href, stamp = appearanceStamp(url)) {
   try {
-    (storage ?? globalThis.localStorage).setItem(APPEARANCE_STORAGE_KEY, JSON.stringify({ appearance: normalizeAppearance(appearance), source: String(url ?? "") }));
+    (storage ?? globalThis.localStorage).setItem(appearanceStorageKey(stamp), JSON.stringify({ appearance: normalizeAppearance(appearance), source: String(url ?? "") }));
   } catch {
     // Editing remains available when browser storage is disabled or full.
   }

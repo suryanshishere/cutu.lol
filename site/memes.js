@@ -3,28 +3,54 @@ import { DEFAULT_APPEARANCE, normalizeAppearance } from "./text-appearance.js";
 // Browser and server share the same templates and URL contract.
 export const DEFAULT_STAMP = "baby-boo";
 export const MAX_TEXT_LENGTH = 120;
-export const CARD_VERSION = "2";
+export const CARD_VERSION = "4";
 export const FRAME_ASPECT_RATIO = 16 / 9;
 export const SITE_TITLE = "Personalized Meme Maker | cutu";
-export const SITE_DESCRIPTION = "Create personalized memes with your own text. Choose Baby Boo or Speed, preview your animated meme, then download a video or GIF or share a personalized link for free.";
+export const SITE_DESCRIPTION = "Create personalized memes with your own text. Choose baby boo, Speed 1, or Speed 2, preview your animated meme, then download a video or GIF or share a personalized link for free.";
 
 export const MEMES = Object.freeze({
   "baby-boo": {
-    id: "baby-boo", name: "Baby Boo", image: "/baby-boo-stamp.png", shareImage: "/share-stamp.png",
+    id: "baby-boo", name: "baby boo", image: "/baby-boo-stamp.png?v=3", shareImage: "/share-stamp.png",
     filename: "hamster-type", scale: 1.08, anchor: "center", hasAudio: true, hasTextMotion: true, opaqueSource: "/hamster-fallback.mp4",
-    defaultText: "Small steps. Big wheel energy.",
-    description: "Add your text to Baby Boo, then download or share your animated hamster meme for free.",
+    frameAspectRatio: FRAME_ASPECT_RATIO, textColor: "#171714", textLayer: "under", textShadow: false, defaultTextPosition: null, defaultTextAlignment: "center",
+    defaultText: "Me acting like I have a plan.",
+    description: "Add your text to baby boo, then download or share your animated hamster meme for free.",
     preview: [["/hamster-preview.webm", 'video/webm; codecs="vp9, opus"'], ["/hamster-fallback.mp4", "video/mp4"]],
     export: [["/hamster-export.webm", 'video/webm; codecs="vp9, opus"'], ["/hamster-fallback.mp4", "video/mp4"]]
   },
   speed: {
-    id: "speed", name: "Speed", image: "/speed-stamp.png?v=2", shareImage: "/speed-stamp.png",
+    id: "speed", name: "Speed 1", image: "/speed1-stamp.png?v=4", shareImage: "/speed1-stamp.png",
     filename: "speed-type", scale: 0.7, anchor: "bottom-left", hasAudio: false, hasTextMotion: false, opaqueSource: null,
-    defaultText: "Your text. Full speed.",
-    description: "Add your text behind Speed, then download or share your animated meme for free.",
+    frameAspectRatio: FRAME_ASPECT_RATIO, textColor: "#171714", textLayer: "under", textShadow: false, defaultTextPosition: { x: 0.73, y: 0.4 }, defaultTextAlignment: "left",
+    defaultText: "When my song comes on.",
+    description: "Add your text to the Speed 1 reaction video, then download or share your animated meme for free.",
     preview: [["/speed.webm", "video/webm"]], export: [["/speed.webm", "video/webm"]]
+  },
+  clip: {
+    id: "clip", name: "Speed 2", image: "/speed2-stamp.png?v=4", shareImage: "/speed2-stamp.png",
+    filename: "clip-type", scale: 1, anchor: "center", hasAudio: true, hasTextMotion: false, opaqueSource: "/clip.mp4",
+    frameAspectRatio: 4 / 3, textColor: "#ffffff", textLayer: "over", textShadow: true, defaultTextPosition: { x: 0.5, y: 0.85 }, defaultTextAlignment: "center",
+    defaultText: "One more day. I promise.",
+    description: "Add white text over Speed 2, then download or share your 28-second video meme for free.",
+    preview: [["/clip.mp4", "video/mp4"]], export: [["/clip.mp4", "video/mp4"]]
   }
 });
+
+// Keep the reference 16:9 preview height while narrower templates change width.
+export function previewWidthPercent(meme) {
+  return Math.min(100, meme.frameAspectRatio / FRAME_ASPECT_RATIO * 100);
+}
+
+export function exportDimensions(meme, longEdge) {
+  return {
+    width: Math.max(2, Math.round(longEdge / 2) * 2),
+    height: Math.max(2, Math.round(longEdge / meme.frameAspectRatio / 2) * 2)
+  };
+}
+
+export function textShadow(size) {
+  return { color: "rgba(0, 0, 0, 0.8)", blur: size * 0.08, offsetY: size * 0.025 };
+}
 
 export function getMeme(id) {
   return MEMES[Object.hasOwn(MEMES, id) ? id : DEFAULT_STAMP];
@@ -42,7 +68,8 @@ export function readMemeUrl(url) {
   const text = normalizeText(url.searchParams.get("text"));
   const appearance = normalizeAppearance({
     fontId: url.searchParams.get("font"), scale: url.searchParams.get("scale"), alignment: url.searchParams.get("align"),
-    position: { x: url.searchParams.get("x"), y: url.searchParams.get("y") }
+    position: { x: url.searchParams.get("x"), y: url.searchParams.get("y") },
+    box: { width: url.searchParams.get("boxWidth"), height: url.searchParams.get("boxHeight") }
   });
   return { meme, text, message: text || meme.defaultText, appearance };
 }
@@ -60,6 +87,11 @@ export function createShareUrl(origin, stamp, value, appearance) {
   if (style.position) {
     url.searchParams.set("x", String(Number(style.position.x.toFixed(6))));
     url.searchParams.set("y", String(Number(style.position.y.toFixed(6))));
+  }
+  for (const dimension of ["width", "height"]) {
+    if (style.box?.[dimension] != null) {
+      url.searchParams.set(dimension === "width" ? "boxWidth" : "boxHeight", String(Number(style.box[dimension].toFixed(6))));
+    }
   }
   return url;
 }

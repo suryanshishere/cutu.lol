@@ -39,7 +39,7 @@ test("returning users report the selected template after switching in either dir
   const form = elements.get("#download-email-form");
   form.elements = { format: { value: "video" } };
   const submit = () => form.dispatchEvent(new Event("submit", { cancelable: true }));
-  for (const [template, format] of [["baby-boo", "video"], ["speed", "gif"], ["baby-boo", "gif"]]) {
+  for (const [template, format] of [["baby-boo", "video"], ["speed", "gif"], ["clip", "video"], ["clip", "gif"], ["baby-boo", "gif"]]) {
     dialog.setMeme(MEMES[template]);
     form.elements.format.value = format;
     submit();
@@ -50,10 +50,10 @@ test("returning users report the selected template after switching in either dir
     assert.equal(event.payload.format, format);
     assert.deepEqual(Object.keys(event.payload).sort(), ["format", "id", "template"]);
   }
-  assert.equal(new Set(events.map((event) => event.payload.id)).size, 3);
-  assert.equal(elements.get("#download-button").clicks, 1);
-  assert.equal(elements.get("#gif-download-button").clicks, 2);
+  assert.equal(new Set(events.map((event) => event.payload.id)).size, 5);
+  assert.equal(elements.get("#download-button").clicks, 2);
+  assert.equal(elements.get("#gif-download-button").clicks, 3);
   rendering = true;
   submit();
-  assert.equal(events.length, 3);
+  assert.equal(events.length, 5);
 });

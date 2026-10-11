@@ -1,4 +1,4 @@
-import { MEMES, SITE_TITLE, SITE_DESCRIPTION, createShareUrl, createCardUrl, readMemeUrl } from "../site/memes.js";
+import { MEMES, SITE_TITLE, SITE_DESCRIPTION, createShareUrl, createCardUrl, readMemeUrl, previewWidthPercent } from "../site/memes.js";
 
 export function escapeMarkup(value) {
   return String(value).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
@@ -50,14 +50,14 @@ export function applyPageMeta(html, url, origin = url.origin) {
     const selected = item.id === meme.id;
     return `<button class="character-stamp${selected ? " is-selected" : ""}" data-stamp="${item.id}" type="button" aria-label="${item.name}" title="${item.name}" aria-pressed="${selected}"><img src="${escapeMarkup(item.image)}" alt="" /></button>`;
   }).join("\n");
-  html = html.replace(/(<textarea\b[^>]*>)[\s\S]*?(<\/textarea>)/, (_, start, end) => `${start}${escapeMarkup(message)}${end}`)
+  html = html.replace(/(<textarea\b[^>]*>)[\s\S]*?(<\/textarea>)/, (_, start, end) => `${start.replace(/placeholder="[^"]*"/, `placeholder="${escapeMarkup(`e.g. ${meme.defaultText}`)}"`)}${escapeMarkup(message)}${end}`)
     .replace(/<label id="text-motion-option"([^>]*)>/, (_, attributes) => `<label id="text-motion-option"${attributes.replace(/\s+hidden(?:="")?/g, "")}${meme.hasTextMotion ? "" : " hidden"}>`)
     .replace(/<input id="text-motion"[^>]*\/>/, () => `<input id="text-motion" type="checkbox"${appearance.position ? "" : " checked"} />`)
     .replace(/<button id="sound-button"([^>]*)>/, (_, attributes) => `<button id="sound-button"${attributes.replace(/\s+hidden(?:="")?/g, "")}${meme.hasAudio ? "" : " hidden"}>`)
     .replace(/(<div class="stamp-picker"[^>]*>)[\s\S]*?(<\/div>)/, (_, start, end) => `${start}${picker}${end}`)
     .replace(/(<video\s+id="meme-video"[\s\S]*?>)[\s\S]*?(<\/video>)/, (_, start, end) => `${start}${sources(meme.preview)}${end}`)
     .replace(/(<video\s+id="export-video"[\s\S]*?>)[\s\S]*?(<\/video>)/, (_, start, end) => `${start}${sources(meme.export)}${end}`)
-    .replace(/<div id="stage"[^>]*>/, () => `<div id="stage" class="stage" data-stamp="${meme.id}" aria-label="${meme.name} Video Preview" data-media-anchor="${meme.anchor}" data-has-audio="${meme.hasAudio}">`)
+    .replace(/<div id="stage"[^>]*>/, () => `<div id="stage" class="stage" data-stamp="${meme.id}" aria-label="${meme.name} Video Preview" data-media-anchor="${meme.anchor}" data-has-audio="${meme.hasAudio}" data-text-layer="${meme.textLayer}" style="--stage-ratio:${meme.frameAspectRatio};--stage-width:${previewWidthPercent(meme)}%;--text-color:${meme.textColor}">`)
     .replace(/<img class="download-stamp"[^>]*\/>/, () => `<img class="download-stamp" src="${escapeMarkup(meme.image)}" alt="${meme.name}" />`);
   return html;
 }

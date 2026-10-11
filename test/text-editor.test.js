@@ -11,6 +11,7 @@ class Element extends EventTarget {
     this.classes = new Set();
     this.captured = new Set();
     this.dataset = {};
+    this.value = "";
     this.style = { setProperty() {} };
     this.classList = {
       add: (...names) => names.forEach((name) => this.classes.add(name)),
@@ -36,7 +37,7 @@ function setup(t) {
       else delete globalThis[name];
     }
   });
-  const elements = Object.fromEntries(["text-overlay", "text-appearance", "text-font", "text-size", "text-size-value", "appearance-status", "text-reset", "text-motion", "text-motion-option"].map((id) => [id, new Element()]));
+  const elements = Object.fromEntries(["text-overlay", "text-appearance", "text-font", "text-size", "text-size-value", "appearance-status", "text-reset", "text-motion", "text-motion-option", "text-resize-width", "text-resize-height", "text-resize-both"].map((id) => [id, new Element()]));
   const alignments = ["left", "center", "right", "justify"].map((alignment) => {
     const element = new Element();
     element.dataset.align = alignment;
@@ -48,7 +49,7 @@ function setup(t) {
   stage.clientHeight = 405;
   stage.clientLeft = stage.clientTop = 1;
   stage.getBoundingClientRect = () => ({ left: 10, top: 20 });
-  const layout = { width: 240, height: 90, effectiveScale: 1 };
+  let layout = { width: 240, height: 90, effectiveScale: 1 };
   let appearance = normalizeAppearance();
   let rect = { left: 455, top: 178.5, width: 240, height: 90 };
   let busy = false;
@@ -75,6 +76,7 @@ function setup(t) {
     onChange: (value) => {
       changes += 1;
       appearance = normalizeAppearance(value);
+      layout = { ...layout, width: appearance.box?.width == null ? 240 : appearance.box.width * 720, height: appearance.box?.height == null ? 90 : appearance.box.height * 405 };
       const position = placeText(layout, 720, 405, appearance.position, "right", appearance.alignment);
       rect = { left: 11 + position.x, top: 21 + position.y, width: layout.width, height: layout.height };
       editor.sync(layout, position, false);
@@ -173,4 +175,66 @@ test("keyboard can move one pixel away from center without snapping back", (t) =
   assert.ok(Math.abs(env.appearance.position.x - (0.5 + 1 / 720)) < 0.00001);
   env.emit("text-overlay", "keydown", { key: "ArrowDown", shiftKey: true });
   assert.ok(Math.abs(env.appearance.position.y - (0.5 + 10 / 405)) < 0.00001);
+});
+
+test("export locks video resizing and Reset clears both dimensions", (t) => {
+  const env = setup(t);
+  env.emit("text-resize-both", "keydown", { key: "ArrowRight", shiftKey: true });
+  assert.ok(env.appearance.box);
+  const previous = env.appearance;
+  env.setBusy(true);
+  env.emit("text-resize-both", "keydown", { key: "ArrowLeft" });
+  assert.deepEqual(env.appearance, previous);
+  for (const axis of ["width", "height", "both"]) {
+    assert.equal(env.elements[`text-resize-${axis}`].disabled, true);
+  }
+  env.setBusy(false);
+  env.emit("text-reset", "click");
+  assert.deepEqual(env.appearance, DEFAULT_APPEARANCE);
+  assert.equal(env.elements["text-overlay"].classes.has("has-custom-box"), false);
+});
+
+test("video handles resize each axis with mouse or touch, freeze placement, and release capture", (t) => {
+  const env = setup(t);
+  for (const pointerType of ["mouse", "touch"]) for (const axis of ["width", "height", "both"]) {
+    env.emit("text-reset", "click");
+    const handle = `text-resize-${axis}`;
+    env.emit(handle, "pointerdown", { pointerType });
+    assert.equal(env.paused, true);
+    env.emit(handle, "pointermove", { pointerType, clientX: 611, clientY: 244 });
+    env.tick();
+    assert.ok(Math.abs(env.appearance.box.width * 720 - (axis === "height" ? 240 : 276)) < 0.00001);
+    assert.ok(Math.abs(env.appearance.box.height * 405 - (axis === "width" ? 90 : 110.5)) < 0.00001);
+    assert.ok(env.appearance.position);
+    assert.equal(env.elements["text-motion"].checked, false);
+    env.emit(handle, "pointerup", { pointerType, clientX: 611, clientY: 244 });
+    assert.equal(env.editor.interacting, false);
+    assert.equal(env.paused, false);
+    assert.equal(env.elements[handle].captured.size, 0);
+  }
+  assert.equal(env.starts, env.stops);
+});
+
+test("resize handles support keyboard, bound dimensions, and stop when rendering or cancelled", (t) => {
+  const env = setup(t);
+  env.emit("text-resize-width", "keydown", { key: "ArrowRight", shiftKey: true });
+  assert.ok(Math.abs(env.appearance.box.width * 720 - 250) < 0.00001);
+  const width = env.appearance.box.width;
+  env.emit("text-resize-width", "keydown", { key: "ArrowDown" });
+  assert.equal(env.appearance.box.width, width);
+  env.emit("text-resize-height", "keydown", { key: "ArrowDown" });
+  assert.ok(Math.abs(env.appearance.box.height * 405 - 91) < 0.00001);
+  env.emit("text-resize-both", "pointerdown");
+  env.emit("text-resize-both", "pointerup", { clientX: 5000, clientY: 5000 });
+  assert.deepEqual(env.appearance.box, { width: 0.9, height: 0.9 });
+  env.emit("text-resize-both", "pointerdown");
+  env.emit("text-resize-both", "pointercancel");
+  assert.equal(env.paused, false);
+  assert.equal(env.editor.interacting, false);
+  const previous = env.appearance;
+  env.setBusy(true);
+  env.emit("text-resize-both", "pointerdown");
+  env.emit("text-resize-width", "keydown", { key: "ArrowLeft" });
+  assert.deepEqual(env.appearance, previous);
+  assert.equal(env.editor.interacting, false);
 });

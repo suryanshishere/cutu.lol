@@ -40,10 +40,9 @@ async function loadSlots() {
         element.disabled = !spot.available || !ready;
         element.setAttribute("aria-label", `Book brand spot ${spot.slot}${!spot.available ? ", currently reserved" : ""}`);
         const plus = document.createElement("span"); plus.className = "brand-plus"; plus.textContent = "+"; plus.setAttribute("aria-hidden", "true");
-        const text = document.createElement("span"); text.textContent = spot.available ? "Insert your brand" : "Reserved";
-        const label = document.createElement("small"); label.textContent = `Spot ${spot.slot}`;
+        const text = document.createElement("span"); text.textContent = spot.available ? "Add your brand" : "Reserved";
         if (!spot.available) element.title = `Available after ${date(spot.availableAt)}`;
-        element.append(plus, text, label); element.addEventListener("click", () => open(spot.slot));
+        element.append(plus, text); element.addEventListener("click", () => open(spot.slot));
       }
       return element;
     });

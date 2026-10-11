@@ -183,7 +183,8 @@ textarea::placeholder {
   position: relative;
   isolation: isolate;
   overflow: hidden;
-  width: 100%;
+  width: var(--stage-width, 100%);
+  margin-inline: auto;
   aspect-ratio: var(--stage-ratio);
   border: 1px solid #e5e3dd;
 }
@@ -192,14 +193,15 @@ textarea::placeholder {
   position: absolute;
   z-index: 1;
   top: 50%;
-  color: var(--ink);
+  color: var(--text-color, var(--ink));
   font-family: Georgia, "Times New Roman", serif;
   font-size: clamp(1.65rem, 4.3vw, 4.5rem);
   font-weight: 700;
   line-height: 0.94;
 }
 
-.stage.is-opaque-source .preview-text {
+.stage.is-opaque-source .preview-text,
+.stage[data-text-layer="over"] .preview-text {
   z-index: 3;
 }
 

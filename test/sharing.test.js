@@ -11,17 +11,17 @@ import { shareCardSvg, renderShareCard } from "../src/share-card.js";
 const origin = "https://cutu.suryansh.lol";
 const source = await readFile(new URL("../site/index.html", import.meta.url), "utf8");
 
-test("legacy links, both stamps, and unknown stamps round-trip through one URL contract", () => {
-  for (const stamp of [undefined, "baby-boo", "speed", "unknown", "__proto__", "constructor"]) {
+test("legacy links, all stamps, and unknown stamps round-trip through one URL contract", () => {
+  for (const stamp of [undefined, ...Object.keys(MEMES), "unknown", "__proto__", "constructor"]) {
     const input = new URL("/", origin);
     if (stamp) input.searchParams.set("stamp", stamp);
     input.searchParams.set("text", "Hello & goodbye!\nA gift 🎁 for you");
     const value = readMemeUrl(input);
-    assert.equal(value.meme.id, stamp === "speed" ? "speed" : "baby-boo");
+    assert.equal(value.meme.id, Object.hasOwn(MEMES, stamp) ? stamp : "baby-boo");
     assert.deepEqual(readMemeUrl(createShareUrl(origin, stamp, value.text)), value);
     const card = createCardUrl(origin, stamp, value.text);
     assert.equal(card.pathname, "/share-card.png");
-    assert.equal(card.searchParams.get("v"), "2");
+    assert.equal(card.searchParams.get("v"), "4");
     assert.equal(readMemeUrl(card).message, value.message);
   }
 });
@@ -52,7 +52,13 @@ test("homepage is general and share metadata matches each selected meme", () => 
     assert.ok(html.includes(`data-stamp="${stamp}" aria-label="${MEMES[stamp].name} Video Preview"`));
     assert.ok(html.includes(`src="${MEMES[stamp].preview[0][0]}"`));
     const motionLabel = html.match(/<label id="text-motion-option"[^>]*>/)[0];
-    assert.equal(motionLabel.includes(" hidden"), stamp === "speed");
+    assert.equal(motionLabel.includes(" hidden"), !MEMES[stamp].hasTextMotion);
+    const soundButton = html.match(/<button id="sound-button"[^>]*>/)[0];
+    assert.equal(soundButton.includes(" hidden"), !MEMES[stamp].hasAudio);
+    const stage = html.match(/<div id="stage"[^>]*>/)[0];
+    assert.ok(stage.includes(`--stage-ratio:${MEMES[stamp].frameAspectRatio}`));
+    assert.ok(stage.includes(`--text-color:${MEMES[stamp].textColor}`));
+    assert.ok(stage.includes(`data-text-layer="${MEMES[stamp].textLayer}"`));
     const graph = JSON.parse(html.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/)[1])["@graph"];
     assert.equal(graph[1].name, "cutu Personalized Meme Maker");
     assert.equal(graph[2].name, meta.title);
@@ -74,7 +80,7 @@ test("markup and replacement-like user text stays inert in HTML, JSON-LD, and SV
   assert.ok(svg.includes('&lt;'));
 });
 
-test("both stamps render valid 1200 by 630 PNGs with different artwork", async () => {
+test("all stamps render valid 1200 by 630 PNGs with different artwork", async () => {
   const font = await readFile(new URL("../site/share-lora.woff2", import.meta.url));
   const cards = [];
   for (const meme of Object.values(MEMES)) {
@@ -89,6 +95,8 @@ test("both stamps render valid 1200 by 630 PNGs with different artwork", async (
     assert.ok(fallback.includes(meme.defaultText.split(" ")[0]));
   }
   assert.notDeepEqual(cards[0], cards[1]);
+  assert.notDeepEqual(cards[1], cards[2]);
+  assert.notDeepEqual(cards[0], cards[2]);
 });
 
 test("Node serves metadata, HEAD, cards, and validated download events", async (t) => {
