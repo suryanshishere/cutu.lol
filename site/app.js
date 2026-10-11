@@ -1,6 +1,6 @@
 import { MEMES, DEFAULT_STAMP, MAX_TEXT_LENGTH, FRAME_ASPECT_RATIO, getMeme, normalizeText, readMemeUrl } from "./memes.js";
 import { layoutText, placeText, textLineX, textRuns } from "./text-layout.js";
-import { normalizeAppearance } from "./text-appearance.js";
+import { normalizeAppearance, restoreAppearance, saveAppearance } from "./text-appearance.js";
 import { createTextEditor } from "./text-editor.js";
 import { createMediaController } from "./media.js";
 import { createDownloadDialog } from "./download-dialog.js";
@@ -28,7 +28,7 @@ let textSide = "right";
 let messageVersion = 0;
 let actionMessageTimer;
 const initial = readMemeUrl(new URL(location.href));
-let appearance = initial.appearance;
+let appearance = restoreAppearance(new URL(location.href), initial.appearance);
 let previewLayout;
 const getStamp = () => getMeme(selectedStamp);
 const getMessage = () => normalizeText(messageInput.value) || getStamp().defaultText;
@@ -46,6 +46,7 @@ const editor = createTextEditor({
   beginGesture: media.beginTextGesture,
   onChange: (next) => {
     appearance = normalizeAppearance(next);
+    saveAppearance(appearance);
     layoutPreviewText();
     invalidateDesign();
   }

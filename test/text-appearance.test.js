@@ -1,11 +1,31 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { DEFAULT_APPEARANCE, TEXT_FONTS, normalizeAppearance } from "../site/text-appearance.js";
+import { DEFAULT_APPEARANCE, TEXT_FONTS, normalizeAppearance, restoreAppearance, saveAppearance } from "../site/text-appearance.js";
 import { layoutText, placeText, clearTextLayoutCache, textLineX, textRuns } from "../site/text-layout.js";
 import { createShareUrl, readMemeUrl } from "../site/memes.js";
 import { pageMetadata } from "../src/page-meta.js";
 
 const origin = "https://cutu.suryansh.lol";
+
+test("appearance persists on refresh while new shared links retain their design", () => {
+  const values = new Map();
+  const storage = { getItem: (key) => values.get(key) ?? null, setItem: (key, value) => values.set(key, value) };
+  const style = { fontId: "handwritten", scale: 1.3, alignment: "center", position: { x: 0.4, y: 0.6 } };
+  const current = new URL("/?text=hello", origin);
+  saveAppearance(style, storage, current.href);
+  assert.deepEqual(restoreAppearance(current, DEFAULT_APPEARANCE, storage), style);
+  assert.deepEqual(restoreAppearance(new URL(origin), DEFAULT_APPEARANCE, storage), style);
+  assert.deepEqual(restoreAppearance(new URL("/?text=other", origin), DEFAULT_APPEARANCE, storage), DEFAULT_APPEARANCE);
+  saveAppearance(DEFAULT_APPEARANCE, storage, current.href);
+  assert.deepEqual(restoreAppearance(current, style, storage), DEFAULT_APPEARANCE);
+});
+
+test("unavailable or malformed storage does not break the editor", () => {
+  const blocked = { getItem() { throw new Error("denied"); }, setItem() { throw new Error("denied"); } };
+  assert.doesNotThrow(() => saveAppearance(DEFAULT_APPEARANCE, blocked));
+  assert.deepEqual(restoreAppearance(new URL(origin), DEFAULT_APPEARANCE, blocked), DEFAULT_APPEARANCE);
+  assert.deepEqual(restoreAppearance(new URL(origin), DEFAULT_APPEARANCE, { getItem: () => "{" }), DEFAULT_APPEARANCE);
+});
 // Predictable metrics let geometry tests run without a browser or native canvas.
 function measuringContext() {
   return {

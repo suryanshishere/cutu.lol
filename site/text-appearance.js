@@ -27,6 +27,29 @@ export function normalizeAppearance(value = {}) {
   };
 }
 
+const APPEARANCE_STORAGE_KEY = "cutu.text-appearance.v1";
+
+export function restoreAppearance(url, initial, storage) {
+  try {
+    const saved = JSON.parse((storage ?? globalThis.localStorage).getItem(APPEARANCE_STORAGE_KEY));
+    if (!saved) return initial;
+    // New shared designs retain their style; edits to the current link survive refresh.
+    const shared = ["text", "stamp", "font", "scale", "align", "x", "y"].some((key) => url.searchParams.has(key));
+    if (shared && saved.source !== url.href) return initial;
+    return normalizeAppearance(saved.appearance);
+  } catch {
+    return initial;
+  }
+}
+
+export function saveAppearance(appearance, storage, url = globalThis.location?.href) {
+  try {
+    (storage ?? globalThis.localStorage).setItem(APPEARANCE_STORAGE_KEY, JSON.stringify({ appearance: normalizeAppearance(appearance), source: String(url ?? "") }));
+  } catch {
+    // Editing remains available when browser storage is disabled or full.
+  }
+}
+
 const fontLoads = new Map();
 export async function loadTextFont(fontId) {
   if (fontId === "classic" || typeof document === "undefined") return;

@@ -66,6 +66,21 @@ test("orders calculate prices on the server, hold one of four slots and keep cre
   assert.equal("logo" in await f.store.get(`booking:${order.bookingId}`), false);
   assert.equal(response.headers.get("Cache-Control"), "no-store");
 });
+test("provider fetch is called without a service receiver, as required by Cloudflare", async () => {
+  const f = fixture();
+  const service = new BrandBookingService(f.store, env, {
+    fetcher: function (...args) {
+      assert.equal(this, undefined, "Native Worker fetch must not receive the booking service as this");
+      return f.service.fetcher(...args);
+    },
+    now: f.now
+  });
+  const response = await service.handle(f.request("order", input));
+  assert.equal(response.status, 200);
+  assert.match((await response.json()).orderId, /^order_/);
+  assert.equal(f.orders.size, 1);
+});
+
 test("concurrent buyers cannot reserve the same slot", async () => {
   const f = fixture(); const responses = await Promise.all([f.service.handle(f.request("order", input)), f.service.handle(f.request("order", input))]);
   assert.deepEqual(responses.map(r => r.status).sort(), [200, 409]); assert.equal(f.orders.size, 1);

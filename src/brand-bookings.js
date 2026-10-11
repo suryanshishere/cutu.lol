@@ -40,7 +40,8 @@ export class BrandBookingService {
   constructor(storage, env, { fetcher = fetch, now = Date.now } = {}) {
     this.storage = storage;
     this.env = env;
-    this.fetcher = fetcher;
+    // Workerd's native fetch rejects the service instance as its `this` receiver.
+    this.fetcher = (...args) => fetcher(...args);
     this.now = now;
     this.queue = Promise.resolve();
   }
