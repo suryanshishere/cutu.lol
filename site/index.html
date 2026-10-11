@@ -28,6 +28,7 @@
     <link rel="icon" type="image/png" href="/baby-boo-stamp.png" />
     <link rel="stylesheet" href="styles.css" />
     <link rel="stylesheet" href="text-editor.css" />
+    <link rel="stylesheet" href="brands.css" />
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-B04H26G5QT"></script>
     <script>
       window.dataLayer = window.dataLayer || [];
@@ -51,13 +52,13 @@
           <span class="visitor-stat" title="Unique Browsers Today">
             <span class="today-dot" aria-hidden="true"></span>
             <strong id="today-viewers">0</strong>
-            <span>Visitors Today</span>
+            <span>Visitors today</span>
           </span>
           <span class="stat-divider" aria-hidden="true"></span>
           <span class="visitor-stat" title="Total Visitors">
             <span class="eye-icon" aria-hidden="true"></span>
             <strong id="total-visits">0</strong>
-            <span>Total Visitors</span>
+            <span>Total visitors</span>
           </span>
         </div>
       </header>
@@ -65,7 +66,7 @@
       <section class="workspace" aria-label="Meme editor">
         <div class="composer">
           <form id="text-form" class="text-form">
-            <label for="message">Type Your Text</label>
+            <label for="message">Type your text</label>
             <div class="sketch-field">
               <textarea
                 id="message"
@@ -74,7 +75,7 @@
                 rows="4"
                 spellcheck="true"
                 aria-label="Video Text"
-                placeholder="Type Something..."
+                placeholder="Type something..."
               >Small steps. Big wheel energy.</textarea>
               <fieldset id="text-appearance" class="text-appearance">
                 <legend class="visually-hidden">Text appearance</legend>
@@ -155,16 +156,23 @@
               </button>
             </div>
           </div>
+          <section class="brand-section" aria-label="Brand spots">
+            <div id="brand-spots" class="brand-spots" aria-busy="true">
+              <button class="brand-spot" type="button" data-brand-slot="1" disabled><span class="brand-plus" aria-hidden="true">+</span><span>Insert your brand</span><small>Spot 1</small></button>
+              <button class="brand-spot" type="button" data-brand-slot="2" disabled><span class="brand-plus" aria-hidden="true">+</span><span>Insert your brand</span><small>Spot 2</small></button>
+              <button class="brand-spot" type="button" data-brand-slot="3" disabled><span class="brand-plus" aria-hidden="true">+</span><span>Insert your brand</span><small>Spot 3</small></button>
+              <button class="brand-spot" type="button" data-brand-slot="4" disabled><span class="brand-plus" aria-hidden="true">+</span><span>Insert your brand</span><small>Spot 4</small></button>
+            </div>
+            <p id="brand-status" class="brand-status" role="status" aria-live="polite">Loading brand spots…</p>
+            <button id="brand-resume" class="brand-text-button" type="button" hidden>Resume your booking</button>
+          </section>
         </div>
       </section>
       <footer class="site-footer">
-        <p>More Little Things Are On The Way.</p>
+        <p>More little things are on the way.</p>
         <nav class="social-links" aria-label="Follow Suryansh">
           <a href="https://x.com/suryaalgorithm" target="_blank" rel="noopener noreferrer" aria-label="Follow Suryansh on X" title="Follow on X">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 3h4.1l4.6 6.2L18 3h2.2l-6.5 7.7L21 21h-4.1l-5-6.8L6.1 21H3.9l6.9-8.2L4 3Zm3.2 1.7 10.5 14.6h1.1L8.3 4.7H7.2Z" fill="currentColor"/></svg>
-          </a>
-          <a href="https://www.linkedin.com/in/suryanshishere/" target="_blank" rel="noopener noreferrer" aria-label="Connect with Suryansh on LinkedIn" title="Connect on LinkedIn">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5.1 8.7V20H2V8.7h3.1ZM3.6 3.4a1.8 1.8 0 1 1 0 3.6 1.8 1.8 0 0 1 0-3.6ZM21 13.5V20h-3.1v-6.1c0-1.5-.5-2.5-1.9-2.5-1 0-1.6.7-1.9 1.3-.1.2-.1.6-.1.9V20h-3.1V8.7H14v1.6c.4-.7 1.3-1.9 3.1-1.9 2.3 0 3.9 1.5 3.9 5.1Z" fill="currentColor"/></svg>
           </a>
         </nav>
       </footer>
@@ -199,9 +207,31 @@
         <a id="gif-download-button" href="#" download="hamster-type.gif" hidden><span id="gif-download-label">GIF</span></a>
       </div>
     </dialog>
+    <dialog id="brand-dialog" class="brand-dialog" aria-labelledby="brand-dialog-title">
+      <button id="brand-close" class="download-close" type="button" aria-label="Close brand booking"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="m5 5 10 10M15 5 5 15" /></svg></button>
+      <h2 id="brand-dialog-title">Book a brand spot</h2>
+      <form id="brand-form" data-clarity-mask="true">
+        <fieldset id="brand-details">
+          <div class="brand-form-row">
+            <div><label for="brand-position">Spot</label><select id="brand-position" required><option value="1">Spot 1</option><option value="2">Spot 2</option><option value="3">Spot 3</option><option value="4">Spot 4</option></select></div>
+            <div class="brand-duration"><label for="brand-days">Duration <output id="brand-days-value" for="brand-days">7 days</output></label><input id="brand-days" type="range" min="1" max="365" step="1" value="7" aria-valuetext="7 days" /></div>
+          </div>
+          <label for="brand-name">Brand name</label><input id="brand-name" maxlength="60" placeholder="Your brand" required />
+          <label for="brand-link">Website</label><input id="brand-link" type="url" placeholder="https://yourbrand.com" maxlength="2000" required aria-describedby="brand-logo-help" />
+          <div class="brand-logo-row"><div id="brand-logo-preview" class="brand-logo-preview" hidden></div><p id="brand-logo-help" class="brand-hint">Logo from your website</p></div>
+        </fieldset>
+        <div class="brand-total"><span>₹1,000 / 7 days</span><output id="brand-amount" for="brand-days">₹1,000</output></div>
+        <p id="brand-error" class="brand-error" role="alert" hidden></p>
+        <button id="brand-pay" class="modal-primary" type="submit">Pay ₹1,000</button>
+        <button id="brand-check" class="brand-text-button" type="button" hidden>Check payment</button>
+        <button id="brand-new" class="brand-text-button" type="button" hidden>Start another booking</button>
+      </form>
+      <div id="brand-success" class="brand-success" role="status" hidden></div>
+    </dialog>
     <p id="action-message" class="action-message" role="status" aria-live="polite"></p>
     <canvas id="export-canvas" hidden></canvas>
     <video id="export-video" muted playsinline preload="none" hidden><source src="/hamster-export.webm" type="video/webm; codecs=&quot;vp9, opus&quot;" /><source src="/hamster-fallback.mp4" type="video/mp4" /></video>
     <script type="module" src="app.js"></script>
+    <script type="module" src="brands.js"></script>
   </body>
 </html>

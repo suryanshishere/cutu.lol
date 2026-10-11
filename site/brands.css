@@ -1,0 +1,47 @@
+.brand-section { margin-top: 24px; }
+.brand-heading { display: flex; justify-content: space-between; gap: 12px; margin: 0 0 12px; color: var(--ui-text); font-size: var(--ui-font-size); }
+.brand-spots { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.brand-spot { display: flex; min-width: 0; min-height: 112px; flex-direction: column; align-items: center; justify-content: center; gap: 8px; padding: 14px 10px; border: 2px dotted #c3bfb6; border-radius: 16px; background: transparent; color: var(--ui-text); text-align: center; text-decoration: none; font-size: var(--ui-font-size); line-height: 1.35; cursor: pointer; }
+.brand-spot:hover:enabled { border-color: var(--ink); color: var(--ui-text); background: #faf9f6; }
+.brand-plus { color: var(--ui-text); font-size: 24px; line-height: 1; font-weight: 400; }
+.brand-spot small { font-size: var(--ui-font-size); color: var(--ui-text); }
+.brand-spot:disabled { cursor: default; opacity: .65; }
+.brand-section .brand-spot:focus-visible { outline: none; border-color: var(--ui-text); }
+.brand-spot.is-booked { border-style: solid; border-color: #eeece6; }
+.brand-spot.is-booked:hover { border-color: #b6b0a4; }
+.brand-spot img { width: 100%; height: 62px; object-fit: contain; }
+.brand-status { min-height: 1em; margin: 9px 0 0; color: var(--ui-text); font-size: var(--ui-font-size); }
+.brand-status:empty { display: none; }
+.brand-dialog { position: fixed; width: min(400px, calc(100% - 32px)); max-height: calc(100dvh - 32px); padding: 20px; border: 2px solid var(--ink); border-radius: 20px; color: var(--ui-text); background: var(--paper); box-shadow: 0 20px 60px rgb(23 23 20 / 16%); overflow-y: auto; overscroll-behavior: contain; }
+.brand-dialog::backdrop { background: rgb(23 23 20 / 35%); }
+.brand-dialog[open] { animation: download-dialog-enter 300ms cubic-bezier(0.16, 1, 0.3, 1) both; transform-origin: center; }
+.brand-dialog[open]::backdrop { animation: download-backdrop-enter 240ms ease-out both; }
+.brand-dialog h2 { margin: 0 40px 16px 0; font: inherit; line-height: 1.35; }
+.brand-dialog .download-close { font-size: 26px; line-height: 1; }
+.brand-dialog fieldset { min-width: 0; margin: 0; padding: 0; border: 0; }
+.brand-dialog label { margin: 10px 0 5px; letter-spacing: normal; }
+.brand-dialog input, .brand-dialog select { display: block; width: 100%; min-width: 0; min-height: 44px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; outline: none; color: #000; background: var(--paper); font: inherit; font-size: var(--ui-font-size); }
+.brand-dialog input[type=range] { min-height: 44px; padding: 0; border: 0; border-radius: 4px; accent-color: var(--ui-text); cursor: pointer; }
+.brand-dialog :disabled { opacity: .7; }
+.brand-form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.brand-form-row label { margin-top: 0; }
+.brand-duration label { display: flex; justify-content: space-between; gap: 8px; }
+.brand-duration output { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.brand-hint { margin: 6px 0 0; color: var(--ui-text); font-size: var(--ui-font-size); line-height: 1.35; }
+.brand-logo-row { display: flex; align-items: center; gap: 8px; min-height: 32px; margin-top: 8px; }
+.brand-logo-row .brand-hint { margin: 0; }
+.brand-logo-preview { display: grid; place-items: center; flex: 0 0 28px; height: 28px; border-radius: 6px; background: var(--stage); }
+.brand-logo-preview img { width: 22px; height: 22px; object-fit: contain; }
+.brand-total { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 14px; font-size: var(--ui-font-size); }
+.brand-total small { display: block; margin-top: 5px; color: var(--ui-text); font-size: var(--ui-font-size); }
+.brand-total output { font-size: var(--ui-font-size); font-weight: 400; font-variant-numeric: tabular-nums; }
+.brand-error { margin: 14px 0; color: var(--ui-text); font-size: var(--ui-font-size); line-height: 1.5; }
+.brand-dialog .modal-primary { width: 100%; margin-top: 12px; }
+.brand-text-button { display: block; padding: 10px 0; border: 0; background: none; color: var(--ink); text-decoration: underline; font: inherit; font-size: var(--ui-font-size); cursor: pointer; }
+.brand-dialog .brand-text-button { margin: 4px auto 0; }
+.brand-success { padding-top: 20px; line-height: 1.6; font-size: var(--ui-font-size); }
+.brand-section :focus-visible, .brand-dialog :focus-visible { outline: 2px solid var(--ink); outline-offset: 4px; }
+.brand-dialog :is(input, select):focus { border-color: var(--ink); outline: none; }
+.brand-section [hidden], .brand-dialog [hidden] { display: none !important; }
+@media (max-width: 480px) { .brand-spots { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; } .brand-spot { min-height: 100px; } .brand-dialog { padding: 18px; } }
+@media (prefers-reduced-motion: reduce) { .brand-dialog[open], .brand-dialog[open]::backdrop { animation: none; } }

@@ -1,4 +1,19 @@
+@font-face {
+  font-family: "Cutu Bricolage Grotesque";
+  src: url("/fonts/bricolage-grotesque-400.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+
 :root {
+  --ui-font-family: "Cutu Bricolage Grotesque", "Arial Narrow", "Avenir Next Condensed", sans-serif;
+  --ui-font-size: 16px;
+  --ui-text: #707070;
+  --visitor-green: #4baf72;
+  font-size: var(--ui-font-size);
+  font-weight: 400;
+  line-height: 1.5;
   --paper: #ffffff;
   --ink: #171714;
   --soft-ink: #76736d;
@@ -7,8 +22,8 @@
   --cheese-deep: #dca92d;
   --stage: #f2f1ed;
   --error: #b63e2e;
-  font-family: "Avenir Next", Avenir, "Segoe UI", sans-serif;
-  color: var(--ink);
+  font-family: var(--ui-font-family);
+  color: var(--ui-text);
   background: var(--paper);
   font-synthesis: none;
 }
@@ -32,6 +47,7 @@ body {
 
 button,
 textarea,
+select,
 input {
   font: inherit;
 }
@@ -54,20 +70,20 @@ a {
 }
 
 label {
-  font-family: "Arial Narrow", "Avenir Next Condensed", "Segoe UI", sans-serif;
-  font-size: 0.71rem;
-  font-weight: 800;
-  letter-spacing: 0.12em;
-  text-transform: capitalize;
+  font-family: var(--ui-font-family);
+  font-size: var(--ui-font-size);
+  font-weight: 400;
+  letter-spacing: normal;
+  text-transform: none;
 }
 
 .site-stats {
   display: flex;
   align-items: center;
-  color: var(--soft-ink);
-  font-family: "Arial Narrow", "Avenir Next Condensed", "Segoe UI", sans-serif;
-  font-weight: 800;
-  text-transform: capitalize;
+  color: var(--ui-text);
+  font-family: var(--ui-font-family);
+  font-weight: 400;
+  text-transform: none;
 }
 
 .visitor-stat {
@@ -78,8 +94,9 @@ label {
 }
 
 .visitor-stat strong {
-  color: var(--ink);
-  font-size: 0.7rem;
+  color: var(--visitor-green);
+  font-size: var(--ui-font-size);
+  font-weight: 400;
   font-variant-numeric: tabular-nums;
 }
 
@@ -87,11 +104,11 @@ label {
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  background: #4baf72;
+  background: var(--visitor-green);
 }
 
 .site-stats.is-offline .today-dot {
-  background: #a5a29a;
+  background: var(--visitor-green);
 }
 
 .stat-divider {
@@ -103,7 +120,7 @@ label {
 label {
   display: block;
   margin: 0 0 10px 3px;
-  color: var(--soft-ink);
+  color: var(--ui-text);
 }
 
 .sketch-field {
@@ -114,7 +131,7 @@ label {
 textarea {
   display: block;
   width: 100%;
-  border: 2px solid var(--ink);
+  border: 2px solid var(--line);
   border-radius: 16px;
   outline: none;
   box-shadow: none;
@@ -126,7 +143,7 @@ textarea:focus-visible {
 }
 
 textarea::placeholder {
-  color: #aaa69d;
+  color: var(--ui-text);
 }
 
 .preview-column {
@@ -200,6 +217,7 @@ textarea::placeholder {
   height: 8px;
   border: 1.5px solid currentColor;
   border-radius: 60% 45%;
+  color: var(--visitor-green);
   transform: rotate(-2deg);
 }
 
@@ -230,7 +248,7 @@ textarea::placeholder {
   border: 1px solid var(--line);
   border-radius: 50%;
   background: var(--paper);
-  color: var(--ink);
+  color: var(--ui-text);
   cursor: pointer;
 }
 
@@ -263,8 +281,8 @@ textarea::placeholder {
 
 .site-stats {
   gap: 14px;
-  font-size: 0.62rem;
-  letter-spacing: 0.07em;
+  font-size: var(--ui-font-size);
+  letter-spacing: normal;
 }
 
 .preview-text {
@@ -293,11 +311,12 @@ textarea::placeholder {
 }
 
 .brand-name {
-  color: var(--ink);
-  font-family: "Brush Script MT", "Segoe Script", "Snell Roundhand", cursive;
-  font-size: 1.3rem;
-  font-weight: 600;
-  letter-spacing: 0.02em;
+  color: var(--ui-text);
+  font-family: "Cutu Caveat", cursive;
+  font-size: 20px;
+  font-weight: 700;
+  font-style: normal;
+  letter-spacing: 0.12em;
   line-height: 1;
   text-transform: none;
 }
@@ -314,20 +333,20 @@ textarea::placeholder {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 112px;
-  min-width: 112px;
+  width: 128px;
+  min-width: 128px;
   height: 44px;
   gap: 7px;
   padding: 0 13px;
   border: 1px solid var(--line);
   border-radius: 999px;
   background: var(--paper);
-  color: var(--soft-ink);
-  font-family: "Arial Narrow", "Avenir Next Condensed", "Segoe UI", sans-serif;
-  font-size: 0.65rem;
-  font-weight: 800;
-  letter-spacing: 0.08em;
-  text-transform: capitalize;
+  color: var(--ui-text);
+  font-family: var(--ui-font-family);
+  font-size: var(--ui-font-size);
+  font-weight: 400;
+  letter-spacing: normal;
+  text-transform: none;
   overflow: hidden;
   transition: width 240ms ease, color 150ms ease, border-color 150ms ease, background 150ms ease, transform 150ms ease;
 }
@@ -340,7 +359,7 @@ textarea::placeholder {
 .share-button.icon-button:hover:not(:disabled) {
   border-color: var(--ink);
   background: #f8f7f4;
-  color: var(--ink);
+  color: var(--ui-text);
 }
 
 .button-icon {
@@ -355,7 +374,7 @@ textarea::placeholder {
 }
 
 #sound-icon.is-on {
-  color: var(--soft-ink);
+  color: var(--ui-text);
 }
 
 .download-button {
@@ -367,7 +386,7 @@ textarea::placeholder {
 
 .download-button:hover {
   background: var(--ink);
-  color: var(--paper);
+  color: var(--ui-text);
   opacity: 1;
   transform: translate(-1px, -2px);
   box-shadow: 5px 5px 0 var(--cheese);
@@ -382,7 +401,7 @@ textarea::placeholder {
   border-color: #b8b5ae;
   background: #b8b5ae;
   box-shadow: none;
-  color: var(--paper);
+  color: var(--ui-text);
 }
 
 .download-button {
@@ -395,13 +414,13 @@ textarea::placeholder {
   border: 1px solid var(--line);
   border-radius: 999px;
   background: var(--paper);
-  color: var(--soft-ink);
+  color: var(--ui-text);
   box-shadow: none;
-  font-family: "Arial Narrow", "Avenir Next Condensed", "Segoe UI", sans-serif;
-  font-size: 0.65rem;
-  font-weight: 800;
-  letter-spacing: 0.08em;
-  text-transform: capitalize;
+  font-family: var(--ui-font-family);
+  font-size: var(--ui-font-size);
+  font-weight: 400;
+  letter-spacing: normal;
+  text-transform: none;
   transition: color 150ms ease, border-color 150ms ease, background 150ms ease, transform 150ms ease;
   cursor: pointer;
 }
@@ -409,7 +428,7 @@ textarea::placeholder {
 .download-button:hover:not(.is-disabled) {
   border-color: var(--ink);
   background: #f8f7f4;
-  color: var(--ink);
+  color: var(--ui-text);
   opacity: 1;
   box-shadow: none;
 }
@@ -447,14 +466,14 @@ textarea::placeholder {
   border-radius: 18px;
   background: var(--paper);
   box-shadow: 0 14px 38px rgb(27 25 19 / 18%), 0 3px 10px rgb(27 25 19 / 8%);
-  color: var(--ink);
-  font-family: "Arial Narrow", "Avenir Next Condensed", "Segoe UI", sans-serif;
-  font-size: 0.72rem;
-  font-weight: 800;
-  letter-spacing: 0.06em;
+  color: var(--ui-text);
+  font-family: var(--ui-font-family);
+  font-size: var(--ui-font-size);
+  font-weight: 400;
+  letter-spacing: normal;
   line-height: 1.4;
   text-align: center;
-  text-transform: capitalize;
+  text-transform: none;
   opacity: 0;
   pointer-events: none;
   transform: translate(-50%, 28px) scale(0.96);
@@ -467,10 +486,10 @@ textarea::placeholder {
 }
 
 .action-message.is-guidance {
-  font-size: 0.76rem;
-  letter-spacing: 0.02em;
+  font-size: var(--ui-font-size);
+  letter-spacing: normal;
   line-height: 1.4;
-  text-transform: capitalize;
+  text-transform: none;
 }
 
 .character-stamp {
@@ -478,7 +497,7 @@ textarea::placeholder {
   place-items: center;
   justify-content: center;
   overflow: visible;
-  color: var(--soft-ink);
+  color: var(--ui-text);
   cursor: pointer;
   transition: color 150ms ease, border-color 150ms ease, background 150ms ease, transform 150ms ease;
 }
@@ -486,7 +505,7 @@ textarea::placeholder {
 .character-stamp:hover {
   border-color: transparent;
   background: transparent;
-  color: var(--ink);
+  color: var(--ui-text);
   transform: none;
 }
 
@@ -497,7 +516,7 @@ textarea::placeholder {
 textarea {
   background: transparent;
   background-color: transparent;
-  color: var(--ink);
+  color: var(--ui-text);
   -webkit-appearance: none;
   appearance: none;
 }
@@ -520,7 +539,7 @@ textarea {
   }
 
   .site-stats {
-    font-size: 0.53rem;
+    font-size: var(--ui-font-size);
   }
 }
 
@@ -572,8 +591,8 @@ textarea {
 }
 
 textarea {
-  font-family: "Avenir Next", Avenir, "Segoe UI", sans-serif;
-  font-size: 1.05rem;
+  font-family: var(--ui-font-family);
+  font-size: var(--ui-font-size);
   line-height: 1.5;
 }
 
@@ -616,7 +635,7 @@ textarea {
   padding: 0;
   border: 1px solid transparent;
   border-radius: 10px;
-  color: var(--soft-ink);
+  color: var(--ui-text);
   cursor: pointer;
 }
 
@@ -633,7 +652,7 @@ textarea {
 .stamp-picker .character-stamp.is-selected {
   border-color: transparent;
   background: transparent;
-  color: var(--ink);
+  color: var(--ui-text);
 }
 
 .stamp-picker .character-stamp.is-selected img {
@@ -687,7 +706,7 @@ textarea {
   border: 1px solid var(--line);
   border-radius: 50%;
   background: rgb(255 255 255 / 92%);
-  color: var(--soft-ink);
+  color: var(--ui-text);
   cursor: pointer;
   box-shadow: none;
 }
@@ -728,16 +747,16 @@ textarea {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 13px;
+  gap: 24px;
   width: min(100%, 720px);
-  margin: clamp(14px, 3vh, 36px) auto 0;
+  margin: clamp(72px, 12vh, 120px) auto 0;
 }
 
 .site-footer p {
   margin: 0;
-  color: var(--soft-ink);
-  font-family: Georgia, "Times New Roman", serif;
-  font-size: 0.93rem;
+  color: var(--ui-text);
+  font-family: var(--ui-font-family);
+  font-size: var(--ui-font-size);
   font-style: italic;
 }
 
@@ -756,7 +775,7 @@ textarea {
   border: 1px solid var(--line);
   border-radius: 50%;
   background: var(--paper);
-  color: var(--ink);
+  color: var(--ui-text);
   transition: background 150ms ease, border-color 150ms ease;
 }
 
@@ -835,18 +854,22 @@ textarea {
     flex-direction: row;
     align-items: center;
     justify-content: center;
-    gap: 9px;
+    gap: 8px 16px;
+    flex-wrap: wrap;
   }
 
   .stat-divider {
-    display: block;
+    display: none;
   }
 }
 
 .download-button {
-  flex: 0 0 116px;
-  width: 116px;
+  flex: 0 0 136px;
+  width: 136px;
   min-height: 44px;
+  border-color: var(--line);
+  background: var(--paper);
+  color: var(--ui-text);
 }
 
 .download-dialog-open {
@@ -867,7 +890,7 @@ textarea {
   border-radius: 20px;
   outline: none;
   background: var(--paper);
-  color: var(--ink);
+  color: var(--ui-text);
   box-shadow: 0 20px 60px rgb(23 23 20 / 16%);
 }
 
@@ -905,12 +928,12 @@ textarea {
   border: 0;
   border-radius: 50%;
   background: transparent;
-  color: var(--soft-ink);
+  color: var(--ui-text);
   cursor: pointer;
 }
 
 .download-close:hover {
-  color: var(--ink);
+  color: var(--ui-text);
   background: var(--stage);
 }
 
@@ -971,18 +994,18 @@ textarea {
   border: 2px solid var(--line);
   border-radius: 12px;
   background: var(--paper);
-  color: var(--soft-ink);
-  font-family: "Arial Narrow", "Avenir Next Condensed", "Segoe UI", sans-serif;
-  font-size: 0.8rem;
-  font-weight: 800;
-  letter-spacing: 0.04em;
+  color: var(--ui-text);
+  font-family: var(--ui-font-family);
+  font-size: var(--ui-font-size);
+  font-weight: 400;
+  letter-spacing: normal;
   cursor: pointer;
 }
 
 .download-format input:checked + span {
   border-color: var(--ink);
   background: var(--cheese);
-  color: var(--ink);
+  color: var(--ui-text);
 }
 
 .download-format input:focus-visible + span {
@@ -1000,13 +1023,13 @@ textarea {
   width: 100%;
   min-height: 50px;
   padding: 12px 16px;
-  border: 2px solid var(--ink);
+  border: 2px solid var(--line);
   border-radius: 16px;
   outline: none;
   background: transparent;
-  color: var(--ink);
-  font-family: "Avenir Next", Avenir, "Segoe UI", sans-serif;
-  font-size: 1.05rem;
+  color: #000;
+  font-family: var(--ui-font-family);
+  font-size: var(--ui-font-size);
   line-height: 1.5;
   box-shadow: none;
   -webkit-appearance: none;
@@ -1014,7 +1037,7 @@ textarea {
 }
 
 .download-email-field input::placeholder {
-  color: #aaa69d;
+  color: var(--ui-text);
 }
 
 .download-email-field input[aria-invalid="true"] {
@@ -1022,18 +1045,18 @@ textarea {
 }
 
 .download-error {
-  color: var(--error);
+  color: var(--ui-text);
 }
 
 .download-dialog p.download-error {
   margin: 0;
-  font-size: 0.85rem;
+  font-size: var(--ui-font-size);
   line-height: 1.5;
 }
 
 #download-result-message {
   margin: 0;
-  font-size: 0.85rem;
+  font-size: var(--ui-font-size);
   line-height: 1.5;
 }
 
@@ -1047,22 +1070,26 @@ textarea {
   padding: 12px 10px;
   border: 2px solid var(--ink);
   border-radius: 12px;
-  font-family: "Arial Narrow", "Avenir Next Condensed", "Segoe UI", sans-serif;
-  font-size: 0.75rem;
-  font-weight: 800;
-  letter-spacing: 0.04em;
+  font-family: var(--ui-font-family);
+  font-size: var(--ui-font-size);
+  font-weight: 400;
+  letter-spacing: normal;
   line-height: 1.4;
   text-decoration: none;
   cursor: pointer;
 }
 
 .modal-primary {
-  background: var(--ink);
-  color: var(--paper);
+  background: var(--stage);
+  color: var(--ink);
+}
+
+#download-continue {
+  color: var(--ink);
 }
 
 .modal-primary:hover:not(:disabled) {
-  background: #35352f;
+  background: #e8e7e3;
 }
 
 .modal-primary:disabled {
@@ -1123,9 +1150,9 @@ textarea {
   outline-offset: 3px;
 }
 
-.download-email-field input:focus-visible {
-  outline: 2px solid var(--cheese);
-  outline-offset: 3px;
+.download-email-field input:focus {
+  border-color: var(--ink);
+  outline: none;
 }
 
 @keyframes download-dialog-enter {

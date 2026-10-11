@@ -4,7 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "node server.mjs",
+    "dev": "node --watch server.mjs",
+    "dev:test": "node --watch server.mjs --test-payments",
     "prepare:public": "node scripts/prepare-public.mjs",
     "dev:cloudflare": "npm run prepare:public && wrangler dev",
     "deploy": "npm run check && npm run prepare:public && wrangler deploy",

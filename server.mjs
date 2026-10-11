@@ -10,6 +10,9 @@ import { createLocalEmailStore } from "./src/local-email-store.js";
 import { readFile } from "node:fs/promises";
 import { adminPageHeaders, createMemoryAdminStore, dashboardPage, handleAdminRequest } from "./src/admin.js";
 import { createMemoryDownloadStore, handleDownloadEvent, templateDownloadRows } from "./src/download-events.js";
+import { BrandBookingService } from "./src/brand-bookings.js";
+import { createLocalBrandStore } from "./src/local-brand-store.js";
+import { createLocalBrandPayments } from "./src/local-brand-payments.js";
 
 try { process.loadEnvFile(); } catch (error) { if (error.code !== "ENOENT") throw error; }
 
@@ -18,6 +21,11 @@ const root = resolve("site");
 const saveEmail = createLocalEmailStore(resolve(".local-data", "emails.json"));
 const adminStore = createMemoryAdminStore();
 const downloadStore = createMemoryDownloadStore();
+const testPayments = process.argv.includes("--test-payments") ? createLocalBrandPayments() : null;
+const brandBookings = testPayments
+  ? new BrandBookingService(testPayments.storage, testPayments.env, { fetcher: testPayments.fetcher })
+  : new BrandBookingService(createLocalBrandStore(resolve(".local-data", "brands.json")), process.env);
+setInterval(() => brandBookings.sweep().catch(() => {}), 60000).unref();
 async function readLocalDashboard(offset) {
   let emails;
   try { emails = JSON.parse(await readFile(resolve(".local-data", "emails.json"), "utf8")); }
@@ -54,6 +62,18 @@ const server = createServer(async (request, response) => {
     response.writeHead(400).end("Bad request");
     return;
   }
+  if (pathname.startsWith("/__local-payments/")) {
+    if (!testPayments) { response.writeHead(404).end("Not found"); return; }
+    if (pathname === "/__local-payments/checkout.js" && request.method === "GET") {
+      response.writeHead(200, { "Content-Type": "text/javascript; charset=utf-8", "Cache-Control": "no-store" });
+      response.end(readFileSync(resolve("src/local-test-checkout.js"), "utf8")); return;
+    }
+    if (pathname === "/__local-payments/complete") {
+      const result = await testPayments.complete(new Request(url, { method: request.method, headers: request.headers, ...(!["GET", "HEAD"].includes(request.method) ? { body: request, duplex: "half" } : {}) }));
+      response.writeHead(result.status, Object.fromEntries(result.headers)); response.end(await result.text()); return;
+    }
+    response.writeHead(404).end("Not found"); return;
+  }
   if (pathname.startsWith("/api/admin/") || pathname === "/api/download-event") {
     try {
       const headers = new Headers(request.headers);
@@ -71,6 +91,19 @@ const server = createServer(async (request, response) => {
       response.writeHead(503, { "Content-Type": "application/json", "Cache-Control": "no-store" });
       response.end(JSON.stringify({ error: "Temporarily unavailable. Try again." }));
     }
+    return;
+  }
+  if (pathname.startsWith("/api/brands/")) {
+    try {
+      const headers = new Headers(request.headers);
+      headers.delete("CF-Connecting-IP");
+      const result = await brandBookings.handle(new Request(url, {
+        method: request.method, headers,
+        ...(!["GET", "HEAD"].includes(request.method) ? { body: request, duplex: "half" } : {})
+      }));
+      response.writeHead(result.status, Object.fromEntries(result.headers));
+      response.end(await result.text());
+    } catch { response.writeHead(503, { "Content-Type": "application/json", "Cache-Control": "no-store" }).end(JSON.stringify({ error: "Bookings are temporarily unavailable." })); }
     return;
   }
   if (pathname === "/api/email-intake") {
@@ -120,7 +153,8 @@ const server = createServer(async (request, response) => {
   const type = contentTypes[extname(filePath).toLowerCase()] || "application/octet-stream";
   if (type.startsWith("text/html")) {
     const source = readFileSync(filePath, "utf8");
-    const html = isAdminPage ? source : applyPageMeta(source, url, url.hostname === "cutu.suryansh.lol" ? "https://cutu.suryansh.lol" : url.origin);
+    let html = isAdminPage ? source : applyPageMeta(source, url, url.hostname === "cutu.suryansh.lol" ? "https://cutu.suryansh.lol" : url.origin);
+    if (testPayments && !isAdminPage) html = html.replace('<script type="module" src="brands.js"></script>', '<script src="/__local-payments/checkout.js"></script><script type="module" src="brands.js"></script>');
     response.writeHead(200, { "Content-Type": type, "Content-Length": Buffer.byteLength(html), "Cache-Control": "no-cache", ...(isAdminPage ? adminPageHeaders() : {}) });
     response.end(request.method === "HEAD" ? undefined : html);
     return;
@@ -154,4 +188,5 @@ const server = createServer(async (request, response) => {
   createReadStream(filePath).pipe(response);
 }).listen(port, "127.0.0.1", () => {
   console.log(`cutu is running at http://127.0.0.1:${server.address().port}`);
+  if (testPayments) console.log("Local payment simulation enabled. No real charges; brand test data resets on restart.");
 });

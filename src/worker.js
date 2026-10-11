@@ -5,6 +5,7 @@ import { readMemeUrl } from "../site/memes.js";
 import { handleEmailIntake } from "./email-intake.js";
 import { adminPageHeaders, adminResponse, readAdminBody } from "./admin.js";
 export { EmailIntake } from "./email-intake.js";
+export { BrandBookings } from "./brand-bookings.js";
 
 const SITE_COUNTER_NAME = "hamster-sitewide";
 const VISITOR_COOKIE = "cutu_visitor";
@@ -82,6 +83,13 @@ export class VisitCounter {
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
+
+    if (url.pathname.startsWith("/api/brands/")) {
+      try {
+        const bookings = env.BRAND_BOOKINGS.get(env.BRAND_BOOKINGS.idFromName("sitewide-brands"));
+        return await bookings.fetch(request);
+      } catch { return Response.json({ error: "Brand bookings are temporarily unavailable. Please retry." }, { status: 503, headers: { "Cache-Control": "no-store" } }); }
+    }
 
     if (["/admin", "/admin/", "/admin.html"].includes(url.pathname)) {
       if (!["GET", "HEAD"].includes(request.method)) return new Response("Method not allowed", { status: 405 });

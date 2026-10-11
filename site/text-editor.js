@@ -141,6 +141,7 @@ export function createTextEditor({ stage, previewText, getStamp, getAppearance, 
       await loadTextFont(fontId);
       if (request !== fontRequest || isRendering()) return;
       clearTextLayoutCache();
+      fontPicker.style.fontFamily = TEXT_FONTS[fontId].family;
       onChange({ ...getAppearance(), fontId });
       status.textContent = `${TEXT_FONTS[fontId].label} selected`;
     } catch {
@@ -186,8 +187,10 @@ export function createTextEditor({ stage, previewText, getStamp, getAppearance, 
       slider.value = String(Math.round(layout.effectiveScale * 100));
       sizeValue.value = `${Math.round(layout.effectiveScale * 100)}%`;
       slider.setAttribute("aria-valuetext", sizeValue.value);
-      if (fontPicker.getAttribute("aria-busy") !== "true") fontPicker.value = getAppearance().fontId;
-      fontPicker.style.fontFamily = TEXT_FONTS[getAppearance().fontId].family;
+      if (fontPicker.getAttribute("aria-busy") !== "true") {
+        fontPicker.value = getAppearance().fontId;
+        fontPicker.style.fontFamily = TEXT_FONTS[getAppearance().fontId].family;
+      }
       alignmentButtons.forEach((button) => button.setAttribute("aria-pressed", String(button.dataset.align === placement.align)));
       motionOption.hidden = !getStamp().hasTextMotion;
       motion.checked = !getAppearance().position;
